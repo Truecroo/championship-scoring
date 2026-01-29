@@ -3,38 +3,51 @@ import cors from 'cors'
 import db from './database.js'
 
 const app = express()
-const PORT = 5000
+const PORT = 5001
 
 app.use(cors())
 app.use(express.json())
 
+// Helper to generate ID
+const generateId = (array) => {
+  return array.length > 0 ? Math.max(...array.map(item => item.id)) + 1 : 1
+}
+
 // ============ NOMINATIONS ============
 
-// Get all nominations
-app.get('/api/nominations', (req, res) => {
+app.get('/api/nominations', async (req, res) => {
   try {
-    const nominations = db.prepare('SELECT * FROM nominations ORDER BY created_at DESC').all()
-    res.json(nominations)
+    await db.read()
+    res.json(db.data.nominations)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Create nomination
-app.post('/api/nominations', (req, res) => {
+app.post('/api/nominations', async (req, res) => {
   try {
+    await db.read()
     const { name } = req.body
-    const result = db.prepare('INSERT INTO nominations (name) VALUES (?)').run(name)
-    res.json({ id: result.lastInsertRowid, name })
+    const nomination = {
+      id: generateId(db.data.nominations),
+      name,
+      created_at: new Date().toISOString()
+    }
+    db.data.nominations.push(nomination)
+    await db.write()
+    res.json(nomination)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Delete nomination
-app.delete('/api/nominations/:id', (req, res) => {
+app.delete('/api/nominations/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM nominations WHERE id = ?').run(req.params.id)
+    await db.read()
+    const id = parseInt(req.params.id)
+    db.data.nominations = db.data.nominations.filter(n => n.id !== id)
+    db.data.teams = db.data.teams.filter(t => t.nomination_id !== id)
+    await db.write()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -43,16 +56,14 @@ app.delete('/api/nominations/:id', (req, res) => {
 
 // ============ TEAMS ============
 
-// Get all teams (optionally filtered by nomination)
-app.get('/api/teams', (req, res) => {
+app.get('/api/teams', async (req, res) => {
   try {
+    await db.read()
     const { nomination_id } = req.query
-    let teams
+    let teams = db.data.teams
 
     if (nomination_id) {
-      teams = db.prepare('SELECT * FROM teams WHERE nomination_id = ? ORDER BY name').all(nomination_id)
-    } else {
-      teams = db.prepare('SELECT * FROM teams ORDER BY name').all()
+      teams = teams.filter(t => t.nomination_id === parseInt(nomination_id))
     }
 
     res.json(teams)
@@ -61,21 +72,30 @@ app.get('/api/teams', (req, res) => {
   }
 })
 
-// Create team
-app.post('/api/teams', (req, res) => {
+app.post('/api/teams', async (req, res) => {
   try {
+    await db.read()
     const { name, nomination_id } = req.body
-    const result = db.prepare('INSERT INTO teams (name, nomination_id) VALUES (?, ?)').run(name, nomination_id)
-    res.json({ id: result.lastInsertRowid, name, nomination_id })
+    const team = {
+      id: generateId(db.data.teams),
+      name,
+      nomination_id: parseInt(nomination_id),
+      created_at: new Date().toISOString()
+    }
+    db.data.teams.push(team)
+    await db.write()
+    res.json(team)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Delete team
-app.delete('/api/teams/:id', (req, res) => {
+app.delete('/api/teams/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM teams WHERE id = ?').run(req.params.id)
+    await db.read()
+    const id = parseInt(req.params.id)
+    db.data.teams = db.data.teams.filter(t => t.id !== id)
+    await db.write()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -84,81 +104,65 @@ app.delete('/api/teams/:id', (req, res) => {
 
 // ============ SCORES ============
 
-// Get all scores
-app.get('/api/scores', (req, res) => {
+app.get('/api/scores', async (req, res) => {
   try {
-    const scores = db.prepare('SELECT * FROM scores ORDER BY timestamp DESC').all()
-    res.json(scores)
+    await db.read()
+    res.json(db.data.scores)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Create score
-app.post('/api/scores', (req, res) => {
+app.post('/api/scores', async (req, res) => {
   try {
+    await db.read()
     const { judge_id, nomination_id, team_id, scores, average, timestamp } = req.body
 
-    const result = db.prepare(`
-      INSERT INTO scores (
-        judge_id, nomination_id, team_id,
-        technique_score, technique_comment,
-        creativity_score, creativity_comment,
-        teamwork_score, teamwork_comment,
-        presentation_score, presentation_comment,
-        overall_score, overall_comment,
-        average, timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      judge_id, nomination_id, team_id,
-      scores.technique.score, scores.technique.comment || null,
-      scores.creativity.score, scores.creativity.comment || null,
-      scores.teamwork.score, scores.teamwork.comment || null,
-      scores.presentation.score, scores.presentation.comment || null,
-      scores.overall.score, scores.overall.comment || null,
-      average, timestamp
-    )
+    const score = {
+      id: generateId(db.data.scores),
+      judge_id,
+      nomination_id: parseInt(nomination_id),
+      team_id: parseInt(team_id),
+      scores,
+      average,
+      timestamp,
+      created_at: new Date().toISOString()
+    }
 
-    res.json({ id: result.lastInsertRowid, success: true })
+    db.data.scores.push(score)
+    await db.write()
+    res.json({ id: score.id, success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Update score
-app.put('/api/scores/:id', (req, res) => {
+app.put('/api/scores/:id', async (req, res) => {
   try {
+    await db.read()
+    const id = parseInt(req.params.id)
     const { scores, average } = req.body
 
-    db.prepare(`
-      UPDATE scores SET
-        technique_score = ?, technique_comment = ?,
-        creativity_score = ?, creativity_comment = ?,
-        teamwork_score = ?, teamwork_comment = ?,
-        presentation_score = ?, presentation_comment = ?,
-        overall_score = ?, overall_comment = ?,
-        average = ?
-      WHERE id = ?
-    `).run(
-      scores.technique.score, scores.technique.comment || null,
-      scores.creativity.score, scores.creativity.comment || null,
-      scores.teamwork.score, scores.teamwork.comment || null,
-      scores.presentation.score, scores.presentation.comment || null,
-      scores.overall.score, scores.overall.comment || null,
-      average,
-      req.params.id
-    )
-
-    res.json({ success: true })
+    const scoreIndex = db.data.scores.findIndex(s => s.id === id)
+    if (scoreIndex !== -1) {
+      db.data.scores[scoreIndex].scores = scores
+      db.data.scores[scoreIndex].average = average
+      await db.write()
+      res.json({ success: true })
+    } else {
+      res.status(404).json({ error: 'Score not found' })
+    }
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Delete score
-app.delete('/api/scores/:id', (req, res) => {
+app.delete('/api/scores/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM scores WHERE id = ?').run(req.params.id)
+    await db.read()
+    const id = parseInt(req.params.id)
+    db.data.scores = db.data.scores.filter(s => s.id !== id)
+    await db.write()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -167,27 +171,32 @@ app.delete('/api/scores/:id', (req, res) => {
 
 // ============ SPECTATOR SCORES ============
 
-// Get all spectator scores
-app.get('/api/spectator-scores', (req, res) => {
+app.get('/api/spectator-scores', async (req, res) => {
   try {
-    const scores = db.prepare('SELECT * FROM spectator_scores ORDER BY timestamp DESC').all()
-    res.json(scores)
+    await db.read()
+    res.json(db.data.spectatorScores)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Create spectator score
-app.post('/api/spectator-scores', (req, res) => {
+app.post('/api/spectator-scores', async (req, res) => {
   try {
+    await db.read()
     const { nomination_id, team_id, score, timestamp } = req.body
 
-    const result = db.prepare(`
-      INSERT INTO spectator_scores (nomination_id, team_id, score, timestamp)
-      VALUES (?, ?, ?, ?)
-    `).run(nomination_id, team_id, score, timestamp)
+    const spectatorScore = {
+      id: generateId(db.data.spectatorScores),
+      nomination_id: parseInt(nomination_id),
+      team_id: parseInt(team_id),
+      score,
+      timestamp,
+      created_at: new Date().toISOString()
+    }
 
-    res.json({ id: result.lastInsertRowid, success: true })
+    db.data.spectatorScores.push(spectatorScore)
+    await db.write()
+    res.json({ id: spectatorScore.id, success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -195,42 +204,47 @@ app.post('/api/spectator-scores', (req, res) => {
 
 // ============ CURRENT TEAM ============
 
-// Get current team for spectators
-app.get('/api/current-team', (req, res) => {
+app.get('/api/current-team', async (req, res) => {
   try {
-    const current = db.prepare(`
-      SELECT
-        ct.team_id,
-        ct.nomination_id,
-        t.name as team_name,
-        n.name as nomination_name
-      FROM current_team ct
-      LEFT JOIN teams t ON ct.team_id = t.id
-      LEFT JOIN nominations n ON ct.nomination_id = n.id
-      WHERE ct.id = 1
-    `).get()
+    await db.read()
+    const { teamId, nominationId } = db.data.currentTeam
 
-    if (!current || !current.team_id) {
+    if (!teamId || !nominationId) {
       res.json(null)
-    } else {
-      res.json(current)
+      return
     }
+
+    const team = db.data.teams.find(t => t.id === teamId)
+    const nomination = db.data.nominations.find(n => n.id === nominationId)
+
+    if (!team || !nomination) {
+      res.json(null)
+      return
+    }
+
+    res.json({
+      team_id: teamId,
+      nomination_id: nominationId,
+      team_name: team.name,
+      nomination_name: nomination.name
+    })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Set current team
-app.post('/api/current-team', (req, res) => {
+app.post('/api/current-team', async (req, res) => {
   try {
+    await db.read()
     const { team_id, nomination_id } = req.body
 
-    db.prepare(`
-      UPDATE current_team
-      SET team_id = ?, nomination_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = 1
-    `).run(team_id, nomination_id)
+    db.data.currentTeam = {
+      teamId: parseInt(team_id),
+      nominationId: parseInt(nomination_id),
+      updated_at: new Date().toISOString()
+    }
 
+    await db.write()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -239,50 +253,36 @@ app.post('/api/current-team', (req, res) => {
 
 // ============ RESULTS ============
 
-// Coefficients for scoring formula
 const COEFFICIENTS = {
   technique: 1.2,
   creativity: 1.0,
   teamwork: 1.1,
   presentation: 0.9,
   overall: 1.3,
-  spectators: 0.5  // Weight for spectator votes
+  spectators: 0.5
 }
 
-// Get results with calculated scores
-app.get('/api/results', (req, res) => {
+app.get('/api/results', async (req, res) => {
   try {
-    // Get all teams with their nominations
-    const teams = db.prepare(`
-      SELECT
-        t.id as team_id,
-        t.name as team_name,
-        n.id as nomination_id,
-        n.name as nomination_name
-      FROM teams t
-      JOIN nominations n ON t.nomination_id = n.id
-      ORDER BY n.name, t.name
-    `).all()
+    await db.read()
 
-    const results = teams.map(team => {
+    const results = db.data.teams.map(team => {
+      const nomination = db.data.nominations.find(n => n.id === team.nomination_id)
+
       // Get judge scores for this team
-      const judgeScores = db.prepare(`
-        SELECT
-          technique_score, creativity_score, teamwork_score,
-          presentation_score, overall_score
-        FROM scores
-        WHERE team_id = ? AND nomination_id = ?
-      `).all(team.team_id, team.nomination_id)
+      const judgeScores = db.data.scores.filter(
+        s => s.team_id === team.id && s.nomination_id === team.nomination_id
+      )
 
       // Calculate weighted average for judges
       let judgesWeightedScore = 0
       if (judgeScores.length > 0) {
         const totals = judgeScores.reduce((acc, score) => {
-          acc.technique += score.technique_score * COEFFICIENTS.technique
-          acc.creativity += score.creativity_score * COEFFICIENTS.creativity
-          acc.teamwork += score.teamwork_score * COEFFICIENTS.teamwork
-          acc.presentation += score.presentation_score * COEFFICIENTS.presentation
-          acc.overall += score.overall_score * COEFFICIENTS.overall
+          acc.technique += score.scores.technique.score * COEFFICIENTS.technique
+          acc.creativity += score.scores.creativity.score * COEFFICIENTS.creativity
+          acc.teamwork += score.scores.teamwork.score * COEFFICIENTS.teamwork
+          acc.presentation += score.scores.presentation.score * COEFFICIENTS.presentation
+          acc.overall += score.scores.overall.score * COEFFICIENTS.overall
           return acc
         }, { technique: 0, creativity: 0, teamwork: 0, presentation: 0, overall: 0 })
 
@@ -299,23 +299,25 @@ app.get('/api/results', (req, res) => {
       }
 
       // Get spectator scores
-      const spectatorScores = db.prepare(`
-        SELECT AVG(score) as avg_score
-        FROM spectator_scores
-        WHERE team_id = ? AND nomination_id = ?
-      `).get(team.team_id, team.nomination_id)
+      const spectatorScores = db.data.spectatorScores.filter(
+        s => s.team_id === team.id && s.nomination_id === team.nomination_id
+      )
 
-      const spectatorsAvg = spectatorScores?.avg_score || 0
+      let spectatorsAvg = 0
+      if (spectatorScores.length > 0) {
+        spectatorsAvg = spectatorScores.reduce((sum, s) => sum + s.score, 0) / spectatorScores.length
+      }
+
       const spectatorsWeighted = spectatorsAvg * COEFFICIENTS.spectators
 
       // Final score
       const finalScore = judgesWeightedScore + spectatorsWeighted
 
       return {
-        team_id: team.team_id,
-        team_name: team.team_name,
+        team_id: team.id,
+        team_name: team.name,
         nomination_id: team.nomination_id,
-        nomination_name: team.nomination_name,
+        nomination_name: nomination?.name || '',
         judges_avg: judgesWeightedScore,
         spectators_avg: spectatorsAvg,
         spectators_weighted: spectatorsWeighted,
@@ -333,5 +335,6 @@ app.get('/api/results', (req, res) => {
 // ============ SERVER ============
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
+  console.log(`✅ Server running on http://localhost:${PORT}`)
+  console.log(`📊 API available at http://localhost:${PORT}/api`)
 })

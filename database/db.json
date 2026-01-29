@@ -1,0 +1,10 @@
+{
+  "nominations": [],
+  "teams": [],
+  "scores": [],
+  "spectatorScores": [],
+  "currentTeam": {
+    "teamId": null,
+    "nominationId": null
+  }
+}
