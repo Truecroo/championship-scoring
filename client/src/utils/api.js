@@ -1,4 +1,5 @@
-const API_URL = '/api'
+// Use environment variable for production, fallback to local proxy for dev
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 // Nominations
 export const getNominations = async () => {
