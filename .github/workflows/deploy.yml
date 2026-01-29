@@ -33,7 +33,7 @@ jobs:
 
       - name: Build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: ${{ secrets.BACKEND }}
         run: |
           cd client
           npm run build
