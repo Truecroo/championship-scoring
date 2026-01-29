@@ -1,6 +1,10 @@
 # Championship Scoring System
 
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue)](https://github.com/Truecroo/championship-scoring)
+
 Система подсчета баллов для танцевальных чемпионатов с тремя интерфейсами:
+
+**🔗 GitHub:** https://github.com/Truecroo/championship-scoring
 
 ## Интерфейсы
 
@@ -26,8 +30,19 @@
 
 - Frontend: React + Vite + TailwindCSS
 - Backend: Node.js + Express
-- База данных: SQLite
+- База данных: lowdb (JSON)
 - Без авторизации
+
+## Deployment
+
+📦 Инструкции по развертыванию на разных платформах: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+Поддерживаемые платформы:
+- Vercel
+- Render
+- Railway
+- VPS/Dedicated Server
+- Docker
 
 ## Установка и запуск
 
@@ -35,7 +50,7 @@
 
 ```bash
 # 1. Клонировать репозиторий
-git clone <your-repo-url>
+git clone https://github.com/Truecroo/championship-scoring.git
 cd championship-scoring
 
 # 2. Установить зависимости для всех частей проекта
