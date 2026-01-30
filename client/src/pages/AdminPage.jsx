@@ -329,53 +329,80 @@ export default function AdminPage() {
                       acc[result.nomination_name].push(result)
                       return acc
                     }, {})
-                  ).map(([nominationName, nominationResults]) => (
-                    <div key={nominationName}>
-                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                        <Trophy className="w-6 h-6 text-amber-500" />
-                        {nominationName}
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-100">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-semibold">Место</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold">Команда</th>
-                              <th className="px-4 py-3 text-right text-sm font-semibold">Средний балл</th>
-                              <th className="px-4 py-3 text-right text-sm font-semibold">Зрители</th>
-                              <th className="px-4 py-3 text-right text-sm font-semibold">Итого</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {nominationResults
-                              .sort((a, b) => b.final_score - a.final_score)
-                              .map((result, index) => (
-                                <tr key={result.team_id} className="border-b">
-                                  <td className="px-4 py-3">
-                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
-                                      index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                                      index === 1 ? 'bg-gray-300 text-gray-900' :
-                                      index === 2 ? 'bg-orange-400 text-orange-900' :
-                                      'bg-gray-100 text-gray-700'
-                                    }`}>
-                                      {index + 1}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 font-medium">{result.team_name}</td>
-                                  <td className="px-4 py-3 text-right">{result.judges_avg?.toFixed(2) || '—'}</td>
-                                  <td className="px-4 py-3 text-right">{result.spectators_avg?.toFixed(2) || '—'}</td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span className="font-bold text-lg text-primary-600">
-                                      {result.final_score.toFixed(2)}
-                                    </span>
-                                  </td>
+                  ).map(([nominationName, nominationResults]) => {
+                    // Сортируем по баллам судей
+                    const sortedByJudges = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
+                    // Находим топ команду по зрительским голосам
+                    const topBySpectators = [...nominationResults].sort((a, b) => b.spectators_avg - a.spectators_avg)[0]
+
+                    return (
+                      <div key={nominationName}>
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                          <Trophy className="w-6 h-6 text-amber-500" />
+                          {nominationName}
+                        </h3>
+
+                        {/* Судейские результаты */}
+                        <div className="mb-6">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">Оценки судей</h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold">Место</th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold">Команда</th>
+                                  <th className="px-4 py-3 text-right text-sm font-semibold">Балл</th>
+                                  <th className="px-4 py-3 text-right text-sm font-semibold">Судей</th>
                                 </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                              </thead>
+                              <tbody>
+                                {sortedByJudges.map((result, index) => (
+                                  <tr key={result.team_id} className="border-b">
+                                    <td className="px-4 py-3">
+                                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                        index === 1 ? 'bg-gray-300 text-gray-900' :
+                                        index === 2 ? 'bg-orange-400 text-orange-900' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {index + 1}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-medium">{result.team_name}</td>
+                                    <td className="px-4 py-3 text-right">
+                                      <span className="font-bold text-lg text-primary-600">
+                                        {result.judges_score?.toFixed(2) || '—'}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-gray-600">
+                                      {result.judges_count || 0}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Зрительские голоса */}
+                        {topBySpectators && topBySpectators.spectator_votes > 0 && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h4 className="text-sm font-semibold text-green-800 mb-2">🎭 Выбор зрителей</h4>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-bold text-green-900">{topBySpectators.team_name}</p>
+                                <p className="text-sm text-green-700">
+                                  Средняя оценка: {topBySpectators.spectators_avg.toFixed(2)}
+                                  ({topBySpectators.spectator_votes} голосов)
+                                </p>
+                              </div>
+                              <Trophy className="w-10 h-10 text-green-600" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

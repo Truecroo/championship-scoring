@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Trophy, ArrowLeft, Save, CheckCircle } from 'lucide-react'
-import { getNominations, getTeams, createScore } from '../utils/api'
+import { Trophy, ArrowLeft, Save, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { getNominations, getTeams, createScore, getScores } from '../utils/api'
 import ScoreInput from '../components/ScoreInput'
 
 const CRITERIA = [
-  { key: 'technique', label: 'Техника', description: 'Точность, форма и исполнение' },
-  { key: 'creativity', label: 'Креативность', description: 'Оригинальность и инновации' },
-  { key: 'teamwork', label: 'Командная работа', description: 'Синхронность и координация' },
-  { key: 'presentation', label: 'Презентация', description: 'Сценическое присутствие' },
-  { key: 'overall', label: 'Общее впечатление', description: 'Целостность выступления' }
+  { key: 'choreography', label: 'Хореография и рисунки', description: 'Сложность и оригинальность постановки', weight: 0.45 },
+  { key: 'technique', label: 'Техника и исполнение', description: 'Точность и качество выполнения', weight: 0.35 },
+  { key: 'artistry', label: 'Артистизм, образ и костюм', description: 'Сценический образ и презентация', weight: 0.15 },
+  { key: 'overall', label: 'Общее впечатление', description: 'Целостность выступления', weight: 0.05 }
 ]
 
 export default function JudgePage() {
@@ -20,11 +19,13 @@ export default function JudgePage() {
   const [selectedTeam, setSelectedTeam] = useState('')
   const [scores, setScores] = useState({})
   const [comments, setComments] = useState({})
+  const [savedScores, setSavedScores] = useState({}) // Сохраненные оценки для всех команд
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
     loadNominations()
+    loadAllScores()
   }, [])
 
   useEffect(() => {
@@ -35,6 +36,28 @@ export default function JudgePage() {
       setSelectedTeam('')
     }
   }, [selectedNomination])
+
+  // Загружаем сохраненные оценки при смене команды
+  useEffect(() => {
+    if (selectedTeam && savedScores[selectedTeam]) {
+      const saved = savedScores[selectedTeam]
+      const newScores = {}
+      const newComments = {}
+
+      CRITERIA.forEach(c => {
+        if (saved.scores[c.key]) {
+          newScores[c.key] = saved.scores[c.key].score
+          newComments[c.key] = saved.scores[c.key].comment
+        }
+      })
+
+      setScores(newScores)
+      setComments(newComments)
+    } else {
+      setScores({})
+      setComments({})
+    }
+  }, [selectedTeam])
 
   const loadNominations = async () => {
     try {
@@ -54,6 +77,22 @@ export default function JudgePage() {
     }
   }
 
+  const loadAllScores = async () => {
+    try {
+      const data = await getScores()
+      // Группируем оценки по командам для текущего судьи
+      const scoresByTeam = {}
+      data.forEach(score => {
+        if (score.judge_id === judgeId) {
+          scoresByTeam[score.team_id] = score
+        }
+      })
+      setSavedScores(scoresByTeam)
+    } catch (error) {
+      console.error('Error loading scores:', error)
+    }
+  }
+
   const handleScoreChange = (criterion, value) => {
     setScores(prev => ({ ...prev, [criterion]: value }))
   }
@@ -62,10 +101,19 @@ export default function JudgePage() {
     setComments(prev => ({ ...prev, [criterion]: value }))
   }
 
-  const calculateAverage = () => {
-    const values = Object.values(scores).filter(v => v != null)
-    if (values.length === 0) return 0
-    return values.reduce((sum, val) => sum + val, 0) / values.length
+  const calculateWeightedAverage = () => {
+    let totalWeighted = 0
+    let hasAllScores = true
+
+    CRITERIA.forEach(c => {
+      if (scores[c.key] != null) {
+        totalWeighted += scores[c.key] * c.weight
+      } else {
+        hasAllScores = false
+      }
+    })
+
+    return hasAllScores ? totalWeighted : 0
   }
 
   const isFormValid = () => {
@@ -89,25 +137,44 @@ export default function JudgePage() {
           }
           return acc
         }, {}),
-        average: calculateAverage(),
+        average: calculateWeightedAverage(),
         timestamp: new Date().toISOString()
       }
 
       await createScore(scoreData)
 
+      // Сохраняем оценки локально
+      setSavedScores(prev => ({
+        ...prev,
+        [selectedTeam]: scoreData
+      }))
+
       // Show success message
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
 
-      // Reset form but keep nomination
-      setSelectedTeam('')
-      setScores({})
-      setComments({})
     } catch (error) {
       console.error('Error submitting scores:', error)
       alert('Ошибка при сохранении оценок')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Навигация по командам
+  const currentTeamIndex = teams.findIndex(t => t.id === parseInt(selectedTeam))
+  const canGoPrev = currentTeamIndex > 0
+  const canGoNext = currentTeamIndex < teams.length - 1 && currentTeamIndex !== -1
+
+  const handlePrevTeam = () => {
+    if (canGoPrev) {
+      setSelectedTeam(teams[currentTeamIndex - 1].id.toString())
+    }
+  }
+
+  const handleNextTeam = () => {
+    if (canGoNext) {
+      setSelectedTeam(teams[currentTeamIndex + 1].id.toString())
     }
   }
 
@@ -117,7 +184,7 @@ export default function JudgePage() {
     '3': 'from-purple-500 to-purple-600'
   }
 
-  const average = calculateAverage()
+  const average = calculateWeightedAverage()
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -158,7 +225,10 @@ export default function JudgePage() {
               </label>
               <select
                 value={selectedNomination}
-                onChange={(e) => setSelectedNomination(e.target.value)}
+                onChange={(e) => {
+                  setSelectedNomination(e.target.value)
+                  setSelectedTeam('')
+                }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="">Выберите номинацию</option>
@@ -180,45 +250,76 @@ export default function JudgePage() {
               >
                 <option value="">Выберите команду</option>
                 {teams.map(team => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
+                  <option key={team.id} value={team.id}>
+                    {team.name} {savedScores[team.id] && '✓'}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {/* Team Navigation */}
+          {selectedTeam && teams.length > 0 && (
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={handlePrevTeam}
+                disabled={!canGoPrev}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                Предыдущая команда
+              </button>
+              <button
+                onClick={handleNextTeam}
+                disabled={!canGoNext}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Следующая команда
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Scoring */}
-        <div className="space-y-6">
-          {CRITERIA.map((criterion) => (
-            <ScoreInput
-              key={criterion.key}
-              label={criterion.label}
-              description={criterion.description}
-              value={scores[criterion.key]}
-              comment={comments[criterion.key]}
-              onScoreChange={(val) => handleScoreChange(criterion.key, val)}
-              onCommentChange={(val) => handleCommentChange(criterion.key, val)}
-            />
-          ))}
-        </div>
-
-        {/* Average & Submit */}
-        <div className="mt-8 bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Средний балл</p>
-              <p className="text-4xl font-bold text-primary-600">{average.toFixed(2)}</p>
+        {selectedTeam && (
+          <>
+            <div className="space-y-6">
+              {CRITERIA.map((criterion) => (
+                <ScoreInput
+                  key={criterion.key}
+                  label={`${criterion.label} (${(criterion.weight * 100).toFixed(0)}%)`}
+                  description={criterion.description}
+                  value={scores[criterion.key]}
+                  comment={comments[criterion.key]}
+                  onScoreChange={(val) => handleScoreChange(criterion.key, val)}
+                  onCommentChange={(val) => handleCommentChange(criterion.key, val)}
+                />
+              ))}
             </div>
-            <button
-              onClick={handleSubmit}
-              disabled={!isFormValid() || loading}
-              className="px-8 py-4 bg-gradient-to-r from-primary-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            >
-              <Save className="w-5 h-5" />
-              {loading ? 'Сохранение...' : 'Сохранить оценки'}
-            </button>
-          </div>
-        </div>
+
+            {/* Average & Submit */}
+            <div className="mt-8 bg-white rounded-xl shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Взвешенный балл</p>
+                  <p className="text-4xl font-bold text-primary-600">{average.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Формула: (Хореография×45% + Техника×35% + Артистизм×15% + Общее×5%)
+                  </p>
+                </div>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!isFormValid() || loading}
+                  className="px-8 py-4 bg-gradient-to-r from-primary-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                >
+                  <Save className="w-5 h-5" />
+                  {loading ? 'Сохранение...' : 'Сохранить оценки'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

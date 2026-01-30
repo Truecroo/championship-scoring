@@ -253,13 +253,12 @@ app.post('/api/current-team', async (req, res) => {
 
 // ============ RESULTS ============
 
-const COEFFICIENTS = {
-  technique: 1.2,
-  creativity: 1.0,
-  teamwork: 1.1,
-  presentation: 0.9,
-  overall: 1.3,
-  spectators: 0.5
+// Новые веса критериев
+const CRITERIA_WEIGHTS = {
+  choreography: 0.45,  // 45%
+  technique: 0.35,     // 35%
+  artistry: 0.15,      // 15%
+  overall: 0.05        // 5%
 }
 
 app.get('/api/results', async (req, res) => {
@@ -277,25 +276,27 @@ app.get('/api/results', async (req, res) => {
       // Calculate weighted average for judges
       let judgesWeightedScore = 0
       if (judgeScores.length > 0) {
-        const totals = judgeScores.reduce((acc, score) => {
-          acc.technique += score.scores.technique.score * COEFFICIENTS.technique
-          acc.creativity += score.scores.creativity.score * COEFFICIENTS.creativity
-          acc.teamwork += score.scores.teamwork.score * COEFFICIENTS.teamwork
-          acc.presentation += score.scores.presentation.score * COEFFICIENTS.presentation
-          acc.overall += score.scores.overall.score * COEFFICIENTS.overall
-          return acc
-        }, { technique: 0, creativity: 0, teamwork: 0, presentation: 0, overall: 0 })
+        // Среднее взвешенное по всем судьям
+        const judgesTotal = judgeScores.reduce((sum, score) => {
+          let weightedScore = 0
 
-        const sumOfCoefficients =
-          COEFFICIENTS.technique +
-          COEFFICIENTS.creativity +
-          COEFFICIENTS.teamwork +
-          COEFFICIENTS.presentation +
-          COEFFICIENTS.overall
+          // Используем новые критерии если они есть
+          if (score.scores.choreography) {
+            weightedScore =
+              score.scores.choreography.score * CRITERIA_WEIGHTS.choreography +
+              score.scores.technique.score * CRITERIA_WEIGHTS.technique +
+              score.scores.artistry.score * CRITERIA_WEIGHTS.artistry +
+              score.scores.overall.score * CRITERIA_WEIGHTS.overall
+          }
+          // Fallback на старые критерии для совместимости
+          else if (score.scores.technique && score.scores.creativity) {
+            weightedScore = score.average || 0
+          }
 
-        judgesWeightedScore =
-          (totals.technique + totals.creativity + totals.teamwork + totals.presentation + totals.overall) /
-          (judgeScores.length * sumOfCoefficients)
+          return sum + weightedScore
+        }, 0)
+
+        judgesWeightedScore = judgesTotal / judgeScores.length
       }
 
       // Get spectator scores
@@ -304,25 +305,21 @@ app.get('/api/results', async (req, res) => {
       )
 
       let spectatorsAvg = 0
+      let spectatorVotes = 0
       if (spectatorScores.length > 0) {
         spectatorsAvg = spectatorScores.reduce((sum, s) => sum + s.score, 0) / spectatorScores.length
+        spectatorVotes = spectatorScores.length
       }
-
-      const spectatorsWeighted = spectatorsAvg * COEFFICIENTS.spectators
-
-      // Final score
-      const finalScore = judgesWeightedScore + spectatorsWeighted
 
       return {
         team_id: team.id,
         team_name: team.name,
         nomination_id: team.nomination_id,
         nomination_name: nomination?.name || '',
-        judges_avg: judgesWeightedScore,
+        judges_score: judgesWeightedScore,
+        judges_count: judgeScores.length,
         spectators_avg: spectatorsAvg,
-        spectators_weighted: spectatorsWeighted,
-        final_score: finalScore,
-        judges_count: judgeScores.length
+        spectator_votes: spectatorVotes
       }
     })
 
