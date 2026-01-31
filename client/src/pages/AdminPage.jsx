@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
@@ -84,6 +84,24 @@ export default function AdminPage() {
 
     await setCurrentTeam(selectedTeamForCurrent, selectedNominationForCurrent)
     loadData()
+  }
+
+  const handleMoveTeamUp = (index) => {
+    if (index === 0) return
+    const newTeams = [...teams]
+    const temp = newTeams[index]
+    newTeams[index] = newTeams[index - 1]
+    newTeams[index - 1] = temp
+    setTeams(newTeams)
+  }
+
+  const handleMoveTeamDown = (index) => {
+    if (index === teams.length - 1) return
+    const newTeams = [...teams]
+    const temp = newTeams[index]
+    newTeams[index] = newTeams[index + 1]
+    newTeams[index + 1] = temp
+    setTeams(newTeams)
   }
 
   const tabs = [
@@ -223,7 +241,7 @@ export default function AdminPage() {
               </form>
 
               <div className="space-y-3">
-                {teams.map((team) => {
+                {teams.map((team, index) => {
                   const nomination = nominations.find(n => n.id === team.nomination_id)
                   return (
                     <div
@@ -237,12 +255,31 @@ export default function AdminPage() {
                           <p className="text-sm text-gray-600">{nomination?.name}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteTeam(team.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleMoveTeamUp(index)}
+                          disabled={index === 0}
+                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          title="Переместить вверх"
+                        >
+                          <ChevronUp className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleMoveTeamDown(index)}
+                          disabled={index === teams.length - 1}
+                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          title="Переместить вниз"
+                        >
+                          <ChevronDown className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTeam(team.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   )
                 })}

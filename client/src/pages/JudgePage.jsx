@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Trophy, ArrowLeft, Save, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Trophy, ArrowLeft, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getNominations, getTeams, createScore, getScores } from '../utils/api'
 import ScoreInput from '../components/ScoreInput'
 
@@ -20,8 +20,9 @@ export default function JudgePage() {
   const [scores, setScores] = useState({})
   const [comments, setComments] = useState({})
   const [savedScores, setSavedScores] = useState({}) // Сохраненные оценки для всех команд
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  const saveTimeoutRef = useRef(null)
 
   useEffect(() => {
     loadNominations()
@@ -94,11 +95,92 @@ export default function JudgePage() {
   }
 
   const handleScoreChange = (criterion, value) => {
-    setScores(prev => ({ ...prev, [criterion]: value }))
+    setScores(prev => {
+      const newScores = { ...prev, [criterion]: value }
+      // Автосохранение после изменения ползунка
+      scheduleAutoSave(newScores, comments)
+      return newScores
+    })
   }
 
   const handleCommentChange = (criterion, value) => {
-    setComments(prev => ({ ...prev, [criterion]: value }))
+    setComments(prev => {
+      const newComments = { ...prev, [criterion]: value }
+      // Автосохранение после изменения комментария (с задержкой)
+      scheduleAutoSave(scores, newComments)
+      return newComments
+    })
+  }
+
+  const scheduleAutoSave = (currentScores, currentComments) => {
+    // Отменяем предыдущий таймер
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+
+    // Запускаем новый таймер (500мс задержка для комментариев)
+    saveTimeoutRef.current = setTimeout(() => {
+      autoSave(currentScores, currentComments)
+    }, 500)
+  }
+
+  const autoSave = async (currentScores, currentComments) => {
+    // Проверяем, что выбраны номинация и команда
+    if (!selectedNomination || !selectedTeam) return
+
+    // Проверяем, что заполнены все оценки
+    const hasAllScores = CRITERIA.every(c =>
+      currentScores[c.key] != null &&
+      currentScores[c.key] >= 0.1 &&
+      currentScores[c.key] <= 10
+    )
+
+    if (!hasAllScores) return
+
+    setSaving(true)
+    try {
+      const scoreData = {
+        judge_id: judgeId,
+        nomination_id: selectedNomination,
+        team_id: selectedTeam,
+        scores: CRITERIA.reduce((acc, c) => {
+          acc[c.key] = {
+            score: currentScores[c.key],
+            comment: currentComments[c.key] || ''
+          }
+          return acc
+        }, {}),
+        average: calculateWeightedAverageFromScores(currentScores),
+        timestamp: new Date().toISOString()
+      }
+
+      await createScore(scoreData)
+
+      // Сохраняем оценки локально
+      setSavedScores(prev => ({
+        ...prev,
+        [selectedTeam]: scoreData
+      }))
+
+      // Показываем уведомление об успехе
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 2000)
+
+    } catch (error) {
+      console.error('Error auto-saving scores:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const calculateWeightedAverageFromScores = (currentScores) => {
+    let totalWeighted = 0
+    CRITERIA.forEach(c => {
+      if (currentScores[c.key] != null) {
+        totalWeighted += currentScores[c.key] * c.weight
+      }
+    })
+    return totalWeighted
   }
 
   const calculateWeightedAverage = () => {
@@ -116,50 +198,6 @@ export default function JudgePage() {
     return hasAllScores ? totalWeighted : 0
   }
 
-  const isFormValid = () => {
-    if (!selectedNomination || !selectedTeam) return false
-    return CRITERIA.every(c => scores[c.key] != null && scores[c.key] >= 0.1 && scores[c.key] <= 10)
-  }
-
-  const handleSubmit = async () => {
-    if (!isFormValid()) return
-
-    setLoading(true)
-    try {
-      const scoreData = {
-        judge_id: judgeId,
-        nomination_id: selectedNomination,
-        team_id: selectedTeam,
-        scores: CRITERIA.reduce((acc, c) => {
-          acc[c.key] = {
-            score: scores[c.key],
-            comment: comments[c.key] || ''
-          }
-          return acc
-        }, {}),
-        average: calculateWeightedAverage(),
-        timestamp: new Date().toISOString()
-      }
-
-      await createScore(scoreData)
-
-      // Сохраняем оценки локально
-      setSavedScores(prev => ({
-        ...prev,
-        [selectedTeam]: scoreData
-      }))
-
-      // Show success message
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
-
-    } catch (error) {
-      console.error('Error submitting scores:', error)
-      alert('Ошибка при сохранении оценок')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Навигация по командам
   const currentTeamIndex = teams.findIndex(t => t.id === parseInt(selectedTeam))
@@ -207,11 +245,18 @@ export default function JudgePage() {
         </div>
       </div>
 
-      {/* Success Message */}
-      {success && (
-        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-bounce">
+      {/* Auto-save indicator */}
+      {saving && (
+        <div className="fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+          <span className="font-medium">Сохранение...</span>
+        </div>
+      )}
+
+      {success && !saving && (
+        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
           <CheckCircle className="w-5 h-5" />
-          <span className="font-semibold">Оценки сохранены!</span>
+          <span className="font-medium">Сохранено!</span>
         </div>
       )}
 
@@ -298,24 +343,17 @@ export default function JudgePage() {
               ))}
             </div>
 
-            {/* Average & Submit */}
+            {/* Average Display */}
             <div className="mt-8 bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Взвешенный балл</p>
-                  <p className="text-4xl font-bold text-primary-600">{average.toFixed(2)}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Формула: (Хореография×45% + Техника×35% + Артистизм×15% + Общее×5%)
-                  </p>
-                </div>
-                <button
-                  onClick={handleSubmit}
-                  disabled={!isFormValid() || loading}
-                  className="px-8 py-4 bg-gradient-to-r from-primary-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                >
-                  <Save className="w-5 h-5" />
-                  {loading ? 'Сохранение...' : 'Сохранить оценки'}
-                </button>
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-2">Взвешенный балл</p>
+                <p className="text-5xl font-bold text-primary-600 mb-2">{average.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">
+                  Формула: (Хореография×45% + Техника×35% + Артистизм×15% + Общее×5%)
+                </p>
+                <p className="text-xs text-gray-400 mt-3">
+                  ✨ Оценки сохраняются автоматически
+                </p>
               </div>
             </div>
           </>
