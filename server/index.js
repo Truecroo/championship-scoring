@@ -1,24 +1,43 @@
 import express from 'express'
 import cors from 'cors'
-import db from './database.js'
+import { createClient } from '@supabase/supabase-js'
 
 const app = express()
 const PORT = process.env.PORT || 5001
 
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('⚠️  Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
+
 app.use(cors())
 app.use(express.json())
 
-// Helper to generate ID
-const generateId = (array) => {
-  return array.length > 0 ? Math.max(...array.map(item => item.id)) + 1 : 1
+// Criteria weights for score calculation
+const CRITERIA_WEIGHTS = {
+  choreography: 0.45,  // 45%
+  technique: 0.35,     // 35%
+  artistry: 0.15,      // 15%
+  overall: 0.05        // 5%
 }
 
 // ============ NOMINATIONS ============
 
 app.get('/api/nominations', async (req, res) => {
   try {
-    await db.read()
-    res.json(db.data.nominations)
+    const { data, error } = await supabase
+      .from('nominations')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -26,16 +45,16 @@ app.get('/api/nominations', async (req, res) => {
 
 app.post('/api/nominations', async (req, res) => {
   try {
-    await db.read()
     const { name } = req.body
-    const nomination = {
-      id: generateId(db.data.nominations),
-      name,
-      created_at: new Date().toISOString()
-    }
-    db.data.nominations.push(nomination)
-    await db.write()
-    res.json(nomination)
+
+    const { data, error } = await supabase
+      .from('nominations')
+      .insert([{ name }])
+      .select()
+      .single()
+
+    if (error) throw error
+    res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -43,11 +62,14 @@ app.post('/api/nominations', async (req, res) => {
 
 app.delete('/api/nominations/:id', async (req, res) => {
   try {
-    await db.read()
-    const id = parseInt(req.params.id)
-    db.data.nominations = db.data.nominations.filter(n => n.id !== id)
-    db.data.teams = db.data.teams.filter(t => t.nomination_id !== id)
-    await db.write()
+    const { id } = req.params
+
+    const { error } = await supabase
+      .from('nominations')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -58,15 +80,21 @@ app.delete('/api/nominations/:id', async (req, res) => {
 
 app.get('/api/teams', async (req, res) => {
   try {
-    await db.read()
     const { nomination_id } = req.query
-    let teams = db.data.teams
+
+    let query = supabase
+      .from('teams')
+      .select('*')
+      .order('created_at', { ascending: true })
 
     if (nomination_id) {
-      teams = teams.filter(t => t.nomination_id === parseInt(nomination_id))
+      query = query.eq('nomination_id', nomination_id)
     }
 
-    res.json(teams)
+    const { data, error } = await query
+
+    if (error) throw error
+    res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -74,17 +102,16 @@ app.get('/api/teams', async (req, res) => {
 
 app.post('/api/teams', async (req, res) => {
   try {
-    await db.read()
     const { name, nomination_id } = req.body
-    const team = {
-      id: generateId(db.data.teams),
-      name,
-      nomination_id: parseInt(nomination_id),
-      created_at: new Date().toISOString()
-    }
-    db.data.teams.push(team)
-    await db.write()
-    res.json(team)
+
+    const { data, error } = await supabase
+      .from('teams')
+      .insert([{ name, nomination_id }])
+      .select()
+      .single()
+
+    if (error) throw error
+    res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -92,10 +119,14 @@ app.post('/api/teams', async (req, res) => {
 
 app.delete('/api/teams/:id', async (req, res) => {
   try {
-    await db.read()
-    const id = parseInt(req.params.id)
-    db.data.teams = db.data.teams.filter(t => t.id !== id)
-    await db.write()
+    const { id } = req.params
+
+    const { error } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -106,8 +137,43 @@ app.delete('/api/teams/:id', async (req, res) => {
 
 app.get('/api/scores', async (req, res) => {
   try {
-    await db.read()
-    res.json(db.data.scores)
+    const { data, error } = await supabase
+      .from('scores')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    // Transform database format to frontend format
+    const transformedData = data.map(score => ({
+      id: score.id,
+      judge_id: score.judge_id,
+      nomination_id: score.nomination_id,
+      team_id: score.team_id,
+      scores: {
+        choreography: {
+          score: parseFloat(score.choreography_score),
+          comment: score.choreography_comment || ''
+        },
+        technique: {
+          score: parseFloat(score.technique_score),
+          comment: score.technique_comment || ''
+        },
+        artistry: {
+          score: parseFloat(score.artistry_score),
+          comment: score.artistry_comment || ''
+        },
+        overall: {
+          score: parseFloat(score.overall_score),
+          comment: score.overall_comment || ''
+        }
+      },
+      average: parseFloat(score.weighted_average),
+      timestamp: score.created_at,
+      created_at: score.created_at
+    }))
+
+    res.json(transformedData)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -115,23 +181,39 @@ app.get('/api/scores', async (req, res) => {
 
 app.post('/api/scores', async (req, res) => {
   try {
-    await db.read()
-    const { judge_id, nomination_id, team_id, scores, average, timestamp } = req.body
+    const { judge_id, nomination_id, team_id, scores } = req.body
 
-    const score = {
-      id: generateId(db.data.scores),
+    // Calculate weighted average
+    const weightedAverage =
+      scores.choreography.score * CRITERIA_WEIGHTS.choreography +
+      scores.technique.score * CRITERIA_WEIGHTS.technique +
+      scores.artistry.score * CRITERIA_WEIGHTS.artistry +
+      scores.overall.score * CRITERIA_WEIGHTS.overall
+
+    // Transform frontend format to database format
+    const scoreData = {
       judge_id,
-      nomination_id: parseInt(nomination_id),
-      team_id: parseInt(team_id),
-      scores,
-      average,
-      timestamp,
-      created_at: new Date().toISOString()
+      nomination_id,
+      team_id,
+      choreography_score: scores.choreography.score,
+      choreography_comment: scores.choreography.comment || null,
+      technique_score: scores.technique.score,
+      technique_comment: scores.technique.comment || null,
+      artistry_score: scores.artistry.score,
+      artistry_comment: scores.artistry.comment || null,
+      overall_score: scores.overall.score,
+      overall_comment: scores.overall.comment || null,
+      weighted_average: weightedAverage
     }
 
-    db.data.scores.push(score)
-    await db.write()
-    res.json({ id: score.id, success: true })
+    const { data, error } = await supabase
+      .from('scores')
+      .insert([scoreData])
+      .select()
+      .single()
+
+    if (error) throw error
+    res.json({ id: data.id, success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -139,19 +221,36 @@ app.post('/api/scores', async (req, res) => {
 
 app.put('/api/scores/:id', async (req, res) => {
   try {
-    await db.read()
-    const id = parseInt(req.params.id)
-    const { scores, average } = req.body
+    const { id } = req.params
+    const { scores } = req.body
 
-    const scoreIndex = db.data.scores.findIndex(s => s.id === id)
-    if (scoreIndex !== -1) {
-      db.data.scores[scoreIndex].scores = scores
-      db.data.scores[scoreIndex].average = average
-      await db.write()
-      res.json({ success: true })
-    } else {
-      res.status(404).json({ error: 'Score not found' })
+    // Calculate weighted average
+    const weightedAverage =
+      scores.choreography.score * CRITERIA_WEIGHTS.choreography +
+      scores.technique.score * CRITERIA_WEIGHTS.technique +
+      scores.artistry.score * CRITERIA_WEIGHTS.artistry +
+      scores.overall.score * CRITERIA_WEIGHTS.overall
+
+    // Transform frontend format to database format
+    const scoreData = {
+      choreography_score: scores.choreography.score,
+      choreography_comment: scores.choreography.comment || null,
+      technique_score: scores.technique.score,
+      technique_comment: scores.technique.comment || null,
+      artistry_score: scores.artistry.score,
+      artistry_comment: scores.artistry.comment || null,
+      overall_score: scores.overall.score,
+      overall_comment: scores.overall.comment || null,
+      weighted_average: weightedAverage
     }
+
+    const { error } = await supabase
+      .from('scores')
+      .update(scoreData)
+      .eq('id', id)
+
+    if (error) throw error
+    res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -159,10 +258,14 @@ app.put('/api/scores/:id', async (req, res) => {
 
 app.delete('/api/scores/:id', async (req, res) => {
   try {
-    await db.read()
-    const id = parseInt(req.params.id)
-    db.data.scores = db.data.scores.filter(s => s.id !== id)
-    await db.write()
+    const { id } = req.params
+
+    const { error } = await supabase
+      .from('scores')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -173,8 +276,13 @@ app.delete('/api/scores/:id', async (req, res) => {
 
 app.get('/api/spectator-scores', async (req, res) => {
   try {
-    await db.read()
-    res.json(db.data.spectatorScores)
+    const { data, error } = await supabase
+      .from('spectator_scores')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -182,21 +290,16 @@ app.get('/api/spectator-scores', async (req, res) => {
 
 app.post('/api/spectator-scores', async (req, res) => {
   try {
-    await db.read()
-    const { nomination_id, team_id, score, timestamp } = req.body
+    const { nomination_id, team_id, score } = req.body
 
-    const spectatorScore = {
-      id: generateId(db.data.spectatorScores),
-      nomination_id: parseInt(nomination_id),
-      team_id: parseInt(team_id),
-      score,
-      timestamp,
-      created_at: new Date().toISOString()
-    }
+    const { data, error } = await supabase
+      .from('spectator_scores')
+      .insert([{ nomination_id, team_id, score }])
+      .select()
+      .single()
 
-    db.data.spectatorScores.push(spectatorScore)
-    await db.write()
-    res.json({ id: spectatorScore.id, success: true })
+    if (error) throw error
+    res.json({ id: data.id, success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -206,25 +309,39 @@ app.post('/api/spectator-scores', async (req, res) => {
 
 app.get('/api/current-team', async (req, res) => {
   try {
-    await db.read()
-    const { teamId, nominationId } = db.data.currentTeam
+    const { data, error } = await supabase
+      .from('current_team')
+      .select('team_id, nomination_id')
+      .eq('id', 1)
+      .single()
 
-    if (!teamId || !nominationId) {
+    if (error) throw error
+
+    if (!data.team_id || !data.nomination_id) {
       res.json(null)
       return
     }
 
-    const team = db.data.teams.find(t => t.id === teamId)
-    const nomination = db.data.nominations.find(n => n.id === nominationId)
+    // Fetch team and nomination names
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('name')
+      .eq('id', data.team_id)
+      .single()
 
-    if (!team || !nomination) {
-      res.json(null)
-      return
-    }
+    if (teamError) throw teamError
+
+    const { data: nomination, error: nominationError } = await supabase
+      .from('nominations')
+      .select('name')
+      .eq('id', data.nomination_id)
+      .single()
+
+    if (nominationError) throw nominationError
 
     res.json({
-      team_id: teamId,
-      nomination_id: nominationId,
+      team_id: data.team_id,
+      nomination_id: data.nomination_id,
       team_name: team.name,
       nomination_name: nomination.name
     })
@@ -235,16 +352,14 @@ app.get('/api/current-team', async (req, res) => {
 
 app.post('/api/current-team', async (req, res) => {
   try {
-    await db.read()
     const { team_id, nomination_id } = req.body
 
-    db.data.currentTeam = {
-      teamId: parseInt(team_id),
-      nominationId: parseInt(nomination_id),
-      updated_at: new Date().toISOString()
-    }
+    const { error } = await supabase
+      .from('current_team')
+      .update({ team_id, nomination_id })
+      .eq('id', 1)
 
-    await db.write()
+    if (error) throw error
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -253,69 +368,70 @@ app.post('/api/current-team', async (req, res) => {
 
 // ============ RESULTS ============
 
-// Новые веса критериев
-const CRITERIA_WEIGHTS = {
-  choreography: 0.45,  // 45%
-  technique: 0.35,     // 35%
-  artistry: 0.15,      // 15%
-  overall: 0.05        // 5%
-}
-
 app.get('/api/results', async (req, res) => {
   try {
-    await db.read()
+    // Fetch all teams with their nominations
+    const { data: teams, error: teamsError } = await supabase
+      .from('teams')
+      .select(`
+        id,
+        name,
+        nomination_id,
+        nominations (
+          name
+        )
+      `)
 
-    const results = db.data.teams.map(team => {
-      const nomination = db.data.nominations.find(n => n.id === team.nomination_id)
+    if (teamsError) throw teamsError
 
+    // Fetch all scores
+    const { data: scores, error: scoresError } = await supabase
+      .from('scores')
+      .select('*')
+
+    if (scoresError) throw scoresError
+
+    // Fetch all spectator scores
+    const { data: spectatorScores, error: spectatorError } = await supabase
+      .from('spectator_scores')
+      .select('*')
+
+    if (spectatorError) throw spectatorError
+
+    // Calculate results for each team
+    const results = teams.map(team => {
       // Get judge scores for this team
-      const judgeScores = db.data.scores.filter(
+      const judgeScores = scores.filter(
         s => s.team_id === team.id && s.nomination_id === team.nomination_id
       )
 
       // Calculate weighted average for judges
       let judgesWeightedScore = 0
       if (judgeScores.length > 0) {
-        // Среднее взвешенное по всем судьям
         const judgesTotal = judgeScores.reduce((sum, score) => {
-          let weightedScore = 0
-
-          // Используем новые критерии если они есть
-          if (score.scores.choreography) {
-            weightedScore =
-              score.scores.choreography.score * CRITERIA_WEIGHTS.choreography +
-              score.scores.technique.score * CRITERIA_WEIGHTS.technique +
-              score.scores.artistry.score * CRITERIA_WEIGHTS.artistry +
-              score.scores.overall.score * CRITERIA_WEIGHTS.overall
-          }
-          // Fallback на старые критерии для совместимости
-          else if (score.scores.technique && score.scores.creativity) {
-            weightedScore = score.average || 0
-          }
-
-          return sum + weightedScore
+          return sum + parseFloat(score.weighted_average)
         }, 0)
 
         judgesWeightedScore = judgesTotal / judgeScores.length
       }
 
-      // Get spectator scores
-      const spectatorScores = db.data.spectatorScores.filter(
+      // Get spectator scores for this team
+      const teamSpectatorScores = spectatorScores.filter(
         s => s.team_id === team.id && s.nomination_id === team.nomination_id
       )
 
       let spectatorsAvg = 0
       let spectatorVotes = 0
-      if (spectatorScores.length > 0) {
-        spectatorsAvg = spectatorScores.reduce((sum, s) => sum + s.score, 0) / spectatorScores.length
-        spectatorVotes = spectatorScores.length
+      if (teamSpectatorScores.length > 0) {
+        spectatorsAvg = teamSpectatorScores.reduce((sum, s) => sum + parseFloat(s.score), 0) / teamSpectatorScores.length
+        spectatorVotes = teamSpectatorScores.length
       }
 
       return {
         team_id: team.id,
         team_name: team.name,
         nomination_id: team.nomination_id,
-        nomination_name: nomination?.name || '',
+        nomination_name: team.nominations?.name || '',
         judges_score: judgesWeightedScore,
         judges_count: judgeScores.length,
         spectators_avg: spectatorsAvg,
@@ -334,4 +450,5 @@ app.get('/api/results', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`)
   console.log(`📊 API available at http://localhost:${PORT}/api`)
+  console.log(`🗄️  Connected to Supabase`)
 })
