@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings, ChevronUp, ChevronDown
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
   getTeams, createTeam, deleteTeam,
   getResults, setCurrentTeam, getCurrentTeam
 } from '../utils/api'
+import * as XLSX from 'xlsx'
+import { QRCodeCanvas } from 'qrcode.react'
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('nominations')
@@ -103,6 +105,49 @@ export default function AdminPage() {
     newTeams[index + 1] = temp
     setTeams(newTeams)
   }
+
+  const handleExportExcel = () => {
+    if (results.length === 0) {
+      alert('Нет данных для экспорта')
+      return
+    }
+
+    // Группируем по номинациям
+    const resultsByNomination = results.reduce((acc, result) => {
+      if (!acc[result.nomination_name]) {
+        acc[result.nomination_name] = []
+      }
+      acc[result.nomination_name].push(result)
+      return acc
+    }, {})
+
+    // Создаем workbook
+    const wb = XLSX.utils.book_new()
+
+    // Для каждой номинации создаем отдельный лист
+    Object.entries(resultsByNomination).forEach(([nominationName, nominationResults]) => {
+      const sortedResults = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
+
+      const data = sortedResults.map((r, index) => ({
+        'Место': index + 1,
+        'Команда': r.team_name,
+        'Балл судей': r.judges_score.toFixed(2),
+        'Кол-во судей': r.judges_count,
+        'Балл зрителей': r.spectators_avg.toFixed(2),
+        'Голосов зрителей': r.spectator_votes
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(data)
+      XLSX.utils.book_append_sheet(wb, ws, nominationName.substring(0, 31)) // Excel limit 31 chars
+    })
+
+    // Сохраняем файл
+    const timestamp = new Date().toISOString().split('T')[0]
+    XLSX.writeFile(wb, `Результаты_чемпионата_${timestamp}.xlsx`)
+  }
+
+  const [showQR, setShowQR] = useState(false)
+  const voteUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}/vote`
 
   const tabs = [
     { id: 'nominations', label: 'Номинации', icon: Trophy },
@@ -357,7 +402,72 @@ export default function AdminPage() {
           {/* Results Tab */}
           {activeTab === 'results' && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">Результаты чемпионата</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">Результаты чемпионата</h2>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowQR(!showQR)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 transition-colors"
+                  >
+                    <QrCode className="w-5 h-5" />
+                    QR-код для зрителей
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={results.length === 0}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Download className="w-5 h-5" />
+                    Экспорт в Excel
+                  </button>
+                </div>
+              </div>
+
+              {/* QR Code Modal */}
+              {showQR && (
+                <div className="mb-6 bg-white border-2 border-blue-200 rounded-xl p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">QR-код для голосования зрителей</h3>
+                      <p className="text-sm text-gray-600">Покажите этот QR-код зрителям или поделитесь ссылкой</p>
+                    </div>
+                    <button
+                      onClick={() => setShowQR(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
+                      <QRCodeCanvas value={voteUrl} size={200} level="H" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Ссылка для голосования:</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={voteUrl}
+                          readOnly
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(voteUrl)
+                            alert('Ссылка скопирована!')
+                          }}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                        >
+                          Копировать
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-3">
+                        💡 Зрители могут сканировать QR-код камерой телефона или перейти по ссылке
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {results.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">Пока нет результатов</p>
