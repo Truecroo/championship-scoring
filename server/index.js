@@ -341,15 +341,22 @@ app.get('/api/spectator-scores', async (req, res) => {
 
 app.post('/api/spectator-scores', async (req, res) => {
   try {
-    const { nomination_id, team_id, score } = req.body
+    const { nomination_id, team_id, score, fingerprint } = req.body
 
     const { data, error } = await supabase
       .from('spectator_scores')
-      .insert([{ nomination_id, team_id, score }])
+      .insert([{ nomination_id, team_id, score, fingerprint }])
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      // Check if it's a unique constraint violation
+      if (error.code === '23505') {
+        return res.status(400).json({ error: 'Вы уже голосовали за эту команду' })
+      }
+      throw error
+    }
+
     res.json({ id: data.id, success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })

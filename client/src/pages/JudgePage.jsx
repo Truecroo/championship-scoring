@@ -222,6 +222,19 @@ export default function JudgePage() {
     '3': 'from-purple-500 to-purple-600'
   }
 
+  // Подсчет прогресса по текущей номинации
+  const getProgress = () => {
+    if (!selectedNomination) return { scored: 0, total: 0, percentage: 0 }
+
+    const nominationTeams = teams.filter(t => t.nomination_id === selectedNomination)
+    const scored = nominationTeams.filter(t => savedScores[t.id]).length
+    const total = nominationTeams.length
+    const percentage = total > 0 ? Math.round((scored / total) * 100) : 0
+
+    return { scored, total, percentage }
+  }
+
+  const progress = getProgress()
   const average = calculateWeightedAverage()
 
   return (
@@ -233,15 +246,31 @@ export default function JudgePage() {
             <ArrowLeft className="w-4 h-4" />
             Назад
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
               <Trophy className="w-10 h-10" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold">Судья {judgeId}</h1>
               <p className="text-white/90">Оценка команд по критериям</p>
             </div>
           </div>
+
+          {/* Progress bar */}
+          {selectedNomination && progress.total > 0 && (
+            <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Прогресс по номинации</span>
+                <span className="text-sm font-bold">{progress.scored} / {progress.total}</span>
+              </div>
+              <div className="w-full bg-white/20 rounded-full h-2.5">
+                <div
+                  className="bg-white h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress.percentage}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
