@@ -1,23 +1,68 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import bcrypt from 'bcryptjs'
+import rateLimit from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 
 const app = express()
 const PORT = process.env.PORT || 5001
 
-// Initialize Supabase client
+// Initialize Supabase client with SERVICE ROLE KEY for RLS bypass
 const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('⚠️  Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.')
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('⚠️  Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables.')
   process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Use service role key to bypass RLS (Row Level Security)
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-app.use(cors())
+// CORS configuration - restrict to your domain only
+const allowedOrigins = [
+  'https://truecroo.github.io',
+  'http://localhost:3000',
+  'http://localhost:5173'
+]
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true)
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true
+}))
+
+// Rate limiting to prevent abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Слишком много запросов с вашего IP, попробуйте позже'
+})
+
+// Stricter rate limit for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 login attempts per windowMs
+  message: 'Слишком много попыток входа, попробуйте позже'
+})
+
+// Stricter rate limit for voting
+const voteLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 20, // limit each IP to 20 votes per 5 minutes
+  message: 'Слишком много голосов, подождите немного'
+})
+
+app.use('/api/', limiter)
 app.use(express.json())
 
 // Criteria weights for score calculation
@@ -30,18 +75,39 @@ const CRITERIA_WEIGHTS = {
 
 // ============ AUTHENTICATION ============
 
-app.post('/api/auth/judge/login', async (req, res) => {
+app.post('/api/auth/judge/login', authLimiter, async (req, res) => {
   try {
     const { judge_id, password } = req.body
 
+    // Validate input
+    if (!judge_id || !password) {
+      return res.status(400).json({ error: 'ID судьи и пароль обязательны' })
+    }
+
+    // Get judge from database (with hashed password)
     const { data, error } = await supabase
       .from('judge_auth')
-      .select('*')
+      .select('id, name, password')
       .eq('id', judge_id)
-      .eq('password', password)
       .single()
 
     if (error || !data) {
+      return res.status(401).json({ error: 'Неверный ID судьи или пароль' })
+    }
+
+    // Check if password starts with $2 (bcrypt hash) or is plaintext
+    let passwordMatch = false
+
+    if (data.password.startsWith('$2')) {
+      // Bcrypt hash - compare securely
+      passwordMatch = await bcrypt.compare(password, data.password)
+    } else {
+      // Plaintext password (backward compatibility during migration)
+      passwordMatch = password === data.password
+      console.warn(`⚠️  Judge ${judge_id} using plaintext password. Please migrate to bcrypt!`)
+    }
+
+    if (!passwordMatch) {
       return res.status(401).json({ error: 'Неверный ID судьи или пароль' })
     }
 
@@ -53,27 +119,50 @@ app.post('/api/auth/judge/login', async (req, res) => {
       }
     })
   } catch (error) {
+    console.error('Judge login error:', error)
     res.status(500).json({ error: error.message })
   }
 })
 
-app.post('/api/auth/admin/login', async (req, res) => {
+app.post('/api/auth/admin/login', authLimiter, async (req, res) => {
   try {
     const { password } = req.body
 
+    // Validate input
+    if (!password) {
+      return res.status(400).json({ error: 'Пароль обязателен' })
+    }
+
+    // Get admin from database (with hashed password)
     const { data, error } = await supabase
       .from('admin_auth')
-      .select('*')
+      .select('id, password')
       .eq('id', 1)
-      .eq('password', password)
       .single()
 
     if (error || !data) {
       return res.status(401).json({ error: 'Неверный пароль администратора' })
     }
 
+    // Check if password starts with $2 (bcrypt hash) or is plaintext
+    let passwordMatch = false
+
+    if (data.password.startsWith('$2')) {
+      // Bcrypt hash - compare securely
+      passwordMatch = await bcrypt.compare(password, data.password)
+    } else {
+      // Plaintext password (backward compatibility during migration)
+      passwordMatch = password === data.password
+      console.warn('⚠️  Admin using plaintext password. Please migrate to bcrypt!')
+    }
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Неверный пароль администратора' })
+    }
+
     res.json({ success: true })
   } catch (error) {
+    console.error('Admin login error:', error)
     res.status(500).json({ error: error.message })
   }
 })
@@ -339,9 +428,19 @@ app.get('/api/spectator-scores', async (req, res) => {
   }
 })
 
-app.post('/api/spectator-scores', async (req, res) => {
+app.post('/api/spectator-scores', voteLimiter, async (req, res) => {
   try {
     const { nomination_id, team_id, score, fingerprint } = req.body
+
+    // Validate input
+    if (!nomination_id || !team_id || score === undefined || !fingerprint) {
+      return res.status(400).json({ error: 'Все поля обязательны' })
+    }
+
+    // Validate score range
+    if (score < 0.1 || score > 10) {
+      return res.status(400).json({ error: 'Оценка должна быть от 0.1 до 10' })
+    }
 
     const { data, error } = await supabase
       .from('spectator_scores')
@@ -359,6 +458,7 @@ app.post('/api/spectator-scores', async (req, res) => {
 
     res.json({ id: data.id, success: true })
   } catch (error) {
+    console.error('Spectator vote error:', error)
     res.status(500).json({ error: error.message })
   }
 })
