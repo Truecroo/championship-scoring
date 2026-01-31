@@ -297,54 +297,59 @@ export default function AdminPage() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-800">
-                  Выберите команду, за которую сейчас могут голосовать зрители
+                  Выберите команду, за которую сейчас могут голосовать зрители. Зрители голосуют по ссылке: <code className="bg-blue-100 px-2 py-1 rounded">/vote</code>
                 </p>
               </div>
 
               {currentTeam && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-green-800 mb-1">Текущая команда:</p>
-                  <p className="font-bold text-green-900">{currentTeam.team_name}</p>
+                  <p className="text-sm text-green-800 mb-1">Сейчас голосуют за:</p>
+                  <p className="font-bold text-lg text-green-900">{currentTeam.team_name}</p>
                   <p className="text-sm text-green-700">{currentTeam.nomination_name}</p>
                 </div>
               )}
 
-              <div className="space-y-3">
-                <select
-                  value={selectedNominationForCurrent}
-                  onChange={(e) => {
-                    setSelectedNominationForCurrent(e.target.value)
-                    setSelectedTeamForCurrent('')
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                >
-                  <option value="">Выберите номинацию</option>
-                  {nominations.map((nom) => (
-                    <option key={nom.id} value={nom.id}>{nom.name}</option>
-                  ))}
-                </select>
+              {/* Быстрое переключение по номинациям */}
+              <div className="space-y-4">
+                {nominations.map((nomination) => {
+                  const nominationTeams = teams.filter(t => t.nomination_id === nomination.id)
+                  if (nominationTeams.length === 0) return null
 
-                <select
-                  value={selectedTeamForCurrent}
-                  onChange={(e) => setSelectedTeamForCurrent(e.target.value)}
-                  disabled={!selectedNominationForCurrent}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 disabled:bg-gray-100"
-                >
-                  <option value="">Выберите команду</option>
-                  {teams
-                    .filter(t => t.nomination_id === selectedNominationForCurrent)
-                    .map((team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                </select>
+                  return (
+                    <div key={nomination.id} className="border border-gray-200 rounded-lg p-4">
+                      <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-amber-500" />
+                        {nomination.name}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {nominationTeams.map((team) => (
+                          <button
+                            key={team.id}
+                            onClick={() => {
+                              setSelectedNominationForCurrent(nomination.id)
+                              setSelectedTeamForCurrent(team.id)
+                              handleSetCurrentTeam()
+                            }}
+                            className={`px-4 py-3 text-left rounded-lg border-2 transition-all ${
+                              currentTeam?.team_id === team.id
+                                ? 'bg-green-50 border-green-500 text-green-900 font-semibold'
+                                : 'bg-white border-gray-200 hover:border-amber-400 hover:bg-amber-50'
+                            }`}
+                          >
+                            {team.name}
+                            {currentTeam?.team_id === team.id && (
+                              <span className="ml-2 text-green-600">●</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
 
-                <button
-                  onClick={handleSetCurrentTeam}
-                  disabled={!selectedTeamForCurrent}
-                  className="w-full px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 font-semibold"
-                >
-                  Установить текущую команду
-                </button>
+                {nominations.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Сначала добавьте номинации и команды</p>
+                )}
               </div>
             </div>
           )}

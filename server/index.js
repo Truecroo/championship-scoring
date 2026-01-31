@@ -28,6 +28,56 @@ const CRITERIA_WEIGHTS = {
   overall: 0.05        // 5%
 }
 
+// ============ AUTHENTICATION ============
+
+app.post('/api/auth/judge/login', async (req, res) => {
+  try {
+    const { judge_id, password } = req.body
+
+    const { data, error } = await supabase
+      .from('judge_auth')
+      .select('*')
+      .eq('id', judge_id)
+      .eq('password', password)
+      .single()
+
+    if (error || !data) {
+      return res.status(401).json({ error: 'Неверный ID судьи или пароль' })
+    }
+
+    res.json({
+      success: true,
+      judge: {
+        id: data.id,
+        name: data.name
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.post('/api/auth/admin/login', async (req, res) => {
+  try {
+    const { password } = req.body
+
+    const { data, error } = await supabase
+      .from('admin_auth')
+      .select('*')
+      .eq('id', 1)
+      .eq('password', password)
+      .single()
+
+    if (error || !data) {
+      return res.status(401).json({ error: 'Неверный пароль администратора' })
+    }
+
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 // ============ NOMINATIONS ============
 
 app.get('/api/nominations', async (req, res) => {
