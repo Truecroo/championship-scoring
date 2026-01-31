@@ -147,7 +147,10 @@ export default function AdminPage() {
   }
 
   const [showQR, setShowQR] = useState(false)
-  const voteUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}/vote`
+  // Формируем правильный URL для голосования
+  const basePath = import.meta.env.BASE_URL || '/'
+  const cleanBasePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath
+  const voteUrl = `${window.location.origin}${cleanBasePath}/vote`
 
   const tabs = [
     { id: 'nominations', label: 'Номинации', icon: Trophy },
