@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trophy, Lock, User } from 'lucide-react'
+import { API_URL } from '../utils/config'
 
 export default function JudgeLoginPage() {
   const [judgeId, setJudgeId] = useState('')
@@ -15,7 +16,7 @@ export default function JudgeLoginPage() {
     setLoading(true)
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/judge/login`, {
+      const response = await fetch(`${API_URL}/auth/judge/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ judge_id: judgeId, password })

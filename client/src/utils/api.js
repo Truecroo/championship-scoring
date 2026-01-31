@@ -2,8 +2,8 @@
 // Change USE_MOCK_API to 'false' when backend is ready
 const USE_MOCK_API = false
 
-// Use environment variable for production, fallback to local proxy for dev
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+// Import shared configuration
+import { API_URL } from './config.js'
 
 // Import mock API
 import * as mockApi from './mockApi.js'
