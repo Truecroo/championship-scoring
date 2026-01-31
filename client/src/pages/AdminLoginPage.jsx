@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings, Lock } from 'lucide-react'
 import { API_URL } from '../utils/config'
@@ -8,6 +8,21 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  // Если уже залогинен - редирект на админку
+  useEffect(() => {
+    const auth = localStorage.getItem('admin_auth')
+    if (auth) {
+      try {
+        const authData = JSON.parse(auth)
+        if (Date.now() - authData.timestamp < 24 * 60 * 60 * 1000) {
+          navigate('/admin', { replace: true })
+        }
+      } catch {
+        localStorage.removeItem('admin_auth')
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

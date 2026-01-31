@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trophy, Lock, User } from 'lucide-react'
 import { API_URL } from '../utils/config'
@@ -9,6 +9,21 @@ export default function JudgeLoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  // Если уже залогинен - редирект на страницу судьи
+  useEffect(() => {
+    const auth = localStorage.getItem('judge_auth')
+    if (auth) {
+      try {
+        const authData = JSON.parse(auth)
+        if (Date.now() - authData.timestamp < 24 * 60 * 60 * 1000) {
+          navigate(`/judge/${authData.id}`, { replace: true })
+        }
+      } catch {
+        localStorage.removeItem('judge_auth')
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

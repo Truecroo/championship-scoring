@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import JudgePage from './pages/JudgePage'
 import AdminPage from './pages/AdminPage'
 import SpectatorPage from './pages/SpectatorPage'
@@ -8,6 +8,7 @@ import AdminLoginPage from './pages/AdminLoginPage'
 
 // Protected Route для судей
 function ProtectedJudgeRoute({ children }) {
+  const { judgeId } = useParams()
   const auth = localStorage.getItem('judge_auth')
 
   if (!auth) {
@@ -16,12 +17,21 @@ function ProtectedJudgeRoute({ children }) {
 
   try {
     const authData = JSON.parse(auth)
+
     // Проверяем, что прошло не более 24 часов
     if (Date.now() - authData.timestamp > 24 * 60 * 60 * 1000) {
       localStorage.removeItem('judge_auth')
       return <Navigate to="/judge-login" replace />
     }
+
+    // ВАЖНО: Проверяем что ID судьи совпадает с авторизованным
+    // Приводим к строке для надёжного сравнения
+    if (String(authData.id) !== String(judgeId)) {
+      // Судья пытается зайти на чужую страницу - редирект на свою
+      return <Navigate to={`/judge/${authData.id}`} replace />
+    }
   } catch {
+    localStorage.removeItem('judge_auth')
     return <Navigate to="/judge-login" replace />
   }
 

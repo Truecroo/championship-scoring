@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { Trophy, ArrowLeft, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Trophy, ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
 import { getNominations, getTeams, createScore, getScores } from '../utils/api'
 import ScoreInput from '../components/ScoreInput'
 
@@ -13,6 +13,7 @@ const CRITERIA = [
 
 export default function JudgePage() {
   const { judgeId } = useParams()
+  const navigate = useNavigate()
   const [nominations, setNominations] = useState([])
   const [teams, setTeams] = useState([])
   const [selectedNomination, setSelectedNomination] = useState('')
@@ -216,6 +217,13 @@ export default function JudgePage() {
     }
   }
 
+  const handleLogout = () => {
+    if (confirm('Вы уверены что хотите выйти?')) {
+      localStorage.removeItem('judge_auth')
+      navigate('/judge-login')
+    }
+  }
+
   const judgeColors = {
     '1': 'from-primary-500 to-primary-600',
     '2': 'from-blue-500 to-blue-600',
@@ -242,10 +250,19 @@ export default function JudgePage() {
       {/* Header */}
       <div className={`bg-gradient-to-r ${judgeColors[judgeId] || 'from-primary-500 to-primary-600'} text-white shadow-lg`}>
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-4">
-            <ArrowLeft className="w-4 h-4" />
-            Назад
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white">
+              <ArrowLeft className="w-4 h-4" />
+              Назад
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Выход
+            </button>
+          </div>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
               <Trophy className="w-10 h-10" />

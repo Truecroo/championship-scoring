@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx'
 import { QRCodeCanvas } from 'qrcode.react'
 
 export default function AdminPage() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('nominations')
   const [nominations, setNominations] = useState([])
   const [teams, setTeams] = useState([])
@@ -146,6 +147,13 @@ export default function AdminPage() {
     XLSX.writeFile(wb, `Результаты_чемпионата_${timestamp}.xlsx`)
   }
 
+  const handleLogout = () => {
+    if (confirm('Вы уверены что хотите выйти?')) {
+      localStorage.removeItem('admin_auth')
+      navigate('/admin-login')
+    }
+  }
+
   const [showQR, setShowQR] = useState(false)
   // Формируем правильный URL для голосования
   const basePath = import.meta.env.BASE_URL || '/'
@@ -164,10 +172,19 @@ export default function AdminPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg">
         <div className="max-w-6xl mx-auto px-4 py-6">
-          <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-4">
-            <ArrowLeft className="w-4 h-4" />
-            Назад
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white">
+              <ArrowLeft className="w-4 h-4" />
+              Назад
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Выйти
+            </button>
+          </div>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
               <Settings className="w-10 h-10" />
