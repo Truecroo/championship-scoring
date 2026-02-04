@@ -286,29 +286,32 @@ export default function AdminPage() {
             <div>
               <h2 className="text-2xl font-bold mb-6">Управление командами</h2>
 
-              <form onSubmit={handleCreateTeam} className="space-y-3 mb-6">
+              <form onSubmit={handleCreateTeam} className="bg-white border-2 border-amber-200 rounded-xl p-6 mb-6">
+                <h3 className="text-lg font-semibold mb-4 text-gray-800">Добавить новую команду</h3>
                 <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    placeholder="Название команды"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  />
                   <select
                     value={selectedNominationForTeam}
                     onChange={(e) => setSelectedNominationForTeam(e.target.value)}
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    className="w-48 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    required
                   >
                     <option value="">Выберите номинацию</option>
                     {nominations.map((nom) => (
                       <option key={nom.id} value={nom.id}>{nom.name}</option>
                     ))}
                   </select>
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    placeholder="Название команды"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
                   <button
                     type="submit"
-                    disabled={!selectedNominationForTeam}
-                    className="px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 flex items-center gap-2 disabled:opacity-50"
+                    disabled={!selectedNominationForTeam || !newTeamName.trim()}
+                    className="px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Plus className="w-5 h-5" />
                     Добавить
@@ -316,53 +319,80 @@ export default function AdminPage() {
                 </div>
               </form>
 
-              <div className="space-y-3">
-                {teams.map((team, index) => {
-                  const nomination = nominations.find(n => n.id === team.nomination_id)
-                  return (
-                    <div
-                      key={team.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Users className="w-5 h-5 text-blue-500" />
-                        <div>
-                          <p className="font-medium">{team.name}</p>
-                          <p className="text-sm text-gray-600">{nomination?.name}</p>
+              {/* Группировка команд по номинациям */}
+              {nominations.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">Сначала создайте номинации</p>
+              ) : (
+                <div className="space-y-6">
+                  {nominations.map((nomination) => {
+                    const nominationTeams = teams.filter(t => t.nomination_id === nomination.id)
+
+                    return (
+                      <div key={nomination.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+                          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Trophy className="w-6 h-6" />
+                            {nomination.name}
+                          </h3>
+                          <p className="text-amber-50 text-sm mt-1">
+                            Команд: {nominationTeams.length}
+                          </p>
+                        </div>
+
+                        <div className="p-6">
+                          {nominationTeams.length === 0 ? (
+                            <p className="text-center text-gray-400 py-6">Нет команд в этой номинации</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {nominationTeams.map((team, index) => {
+                                const globalIndex = teams.findIndex(t => t.id === team.id)
+                                return (
+                                  <div
+                                    key={team.id}
+                                    className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                  >
+                                    <div className="flex-shrink-0 w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
+                                      {index + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="font-semibold text-gray-800">{team.name}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleMoveTeamUp(globalIndex)}
+                                        disabled={globalIndex === 0}
+                                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        title="Переместить вверх"
+                                      >
+                                        <ChevronUp className="w-5 h-5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleMoveTeamDown(globalIndex)}
+                                        disabled={globalIndex === teams.length - 1}
+                                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        title="Переместить вниз"
+                                      >
+                                        <ChevronDown className="w-5 h-5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTeam(team.id)}
+                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Удалить команду"
+                                      >
+                                        <Trash2 className="w-5 h-5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleMoveTeamUp(index)}
-                          disabled={index === 0}
-                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          title="Переместить вверх"
-                        >
-                          <ChevronUp className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleMoveTeamDown(index)}
-                          disabled={index === teams.length - 1}
-                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          title="Переместить вниз"
-                        >
-                          <ChevronDown className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTeam(team.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-                {teams.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">Нет команд</p>
-                )}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
 
