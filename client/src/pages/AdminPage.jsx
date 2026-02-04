@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
@@ -33,6 +33,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (activeTab === 'results') {
       loadResults()
+    }
+  }, [activeTab])
+
+  // Auto-refresh results every 5 seconds when on results tab
+  useEffect(() => {
+    if (activeTab === 'results') {
+      const interval = setInterval(() => {
+        loadResults()
+      }, 5000) // Refresh every 5 seconds
+
+      return () => clearInterval(interval)
     }
   }, [activeTab])
 
@@ -425,6 +436,14 @@ export default function AdminPage() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Результаты чемпионата</h2>
                 <div className="flex gap-3">
+                  <button
+                    onClick={loadResults}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 transition-colors"
+                    title="Обновить результаты"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    Обновить
+                  </button>
                   <button
                     onClick={() => setShowQR(!showQR)}
                     className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 transition-colors"

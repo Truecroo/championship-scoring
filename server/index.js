@@ -323,12 +323,13 @@ app.post('/api/scores', async (req, res) => {
   try {
     const { judge_id, nomination_id, team_id, scores } = req.body
 
-    // Calculate weighted average
-    const weightedAverage =
+    // Calculate weighted average with proper rounding to fix floating point precision
+    const weightedAverage = Number((
       scores.choreography.score * CRITERIA_WEIGHTS.choreography +
       scores.technique.score * CRITERIA_WEIGHTS.technique +
       scores.artistry.score * CRITERIA_WEIGHTS.artistry +
       scores.overall.score * CRITERIA_WEIGHTS.overall
+    ).toFixed(2))
 
     // Transform frontend format to database format
     const scoreData = {
@@ -364,12 +365,13 @@ app.put('/api/scores/:id', async (req, res) => {
     const { id } = req.params
     const { scores } = req.body
 
-    // Calculate weighted average
-    const weightedAverage =
+    // Calculate weighted average with proper rounding to fix floating point precision
+    const weightedAverage = Number((
       scores.choreography.score * CRITERIA_WEIGHTS.choreography +
       scores.technique.score * CRITERIA_WEIGHTS.technique +
       scores.artistry.score * CRITERIA_WEIGHTS.artistry +
       scores.overall.score * CRITERIA_WEIGHTS.overall
+    ).toFixed(2))
 
     // Transform frontend format to database format
     const scoreData = {
