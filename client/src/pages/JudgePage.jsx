@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Trophy, ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
-import { getNominations, getTeams, createScore, getScores } from '../utils/api'
+import { getNominations, getTeams, createScore, updateScore, getScores } from '../utils/api'
 import ScoreInput from '../components/ScoreInput'
 
 const CRITERIA = [
@@ -155,7 +155,18 @@ export default function JudgePage() {
         timestamp: new Date().toISOString()
       }
 
-      await createScore(scoreData)
+      // Проверяем существует ли уже оценка для этой команды
+      const existingScore = savedScores[selectedTeam]
+
+      if (existingScore && existingScore.id) {
+        // UPDATE: оценка уже существует
+        await updateScore(existingScore.id, scoreData)
+      } else {
+        // CREATE: новая оценка
+        const result = await createScore(scoreData)
+        // Сохраняем ID для будущих обновлений
+        scoreData.id = result.id
+      }
 
       // Сохраняем оценки локально
       setSavedScores(prev => ({
