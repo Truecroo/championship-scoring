@@ -235,11 +235,29 @@ export default function JudgePage() {
     }
   }
 
-  const judgeColors = {
-    '1': 'from-primary-500 to-primary-600',
-    '2': 'from-blue-500 to-blue-600',
-    '3': 'from-purple-500 to-purple-600'
+  // Цветовая схема для каждого судьи
+  // Судья 1 (Алинучи): фон #5c5c5c, текст белый
+  // Судья 2 (Эмиль): фон #ABC0D2, текст темный
+  // Судья 3 (Алина Черновская): фон #FFa057, текст темный
+  const judgeThemes = {
+    '1': {
+      bg: '#5c5c5c',
+      text: '#FFFFFF',
+      name: 'Алинучи'
+    },
+    '2': {
+      bg: '#ABC0D2',
+      text: '#1D1D1D',
+      name: 'Эмиль'
+    },
+    '3': {
+      bg: '#FFa057',
+      text: '#141414',
+      name: 'Алина Черновская'
+    }
   }
+
+  const theme = judgeThemes[judgeId] || judgeThemes['1']
 
   // Подсчет прогресса по текущей номинации
   const getProgress = () => {
@@ -257,18 +275,19 @@ export default function JudgePage() {
   const average = calculateWeightedAverage()
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen pb-20" style={{ backgroundColor: theme.bg }}>
       {/* Header */}
-      <div className={`bg-gradient-to-r ${judgeColors[judgeId] || 'from-primary-500 to-primary-600'} text-white shadow-lg`}>
+      <div style={{ backgroundColor: '#1d1d1d', color: theme.text }} className="shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-4">
-            <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white">
+            <Link to="/" className="inline-flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity" style={{ color: theme.text }}>
               <ArrowLeft className="w-4 h-4" />
               Назад
             </Link>
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+              style={{ color: theme.text }}
             >
               <LogOut className="w-4 h-4" />
               Выход
@@ -276,11 +295,11 @@ export default function JudgePage() {
           </div>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
-              <Trophy className="w-10 h-10" />
+              <Trophy className="w-10 h-10" style={{ color: theme.text }} />
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold">Судья {judgeId}</h1>
-              <p className="text-white/90">Оценка команд по критериям</p>
+              <h1 className="text-3xl font-bold" style={{ color: theme.text }}>{theme.name}</h1>
+              <p className="opacity-90" style={{ color: theme.text }}>Оценка команд по критериям</p>
             </div>
           </div>
 
@@ -288,13 +307,13 @@ export default function JudgePage() {
           {selectedNomination && progress.total > 0 && (
             <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Прогресс по номинации</span>
-                <span className="text-sm font-bold">{progress.scored} / {progress.total}</span>
+                <span className="text-sm font-medium" style={{ color: theme.text }}>Прогресс по номинации</span>
+                <span className="text-sm font-bold" style={{ color: theme.text }}>{progress.scored} / {progress.total}</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-2.5">
                 <div
-                  className="bg-white h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${progress.percentage}%` }}
+                  className="h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress.percentage}%`, backgroundColor: '#FF6E00' }}
                 ></div>
               </div>
             </div>

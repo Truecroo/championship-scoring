@@ -120,16 +120,16 @@ export default function SpectatorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-500 to-emerald-600">
+    <div className="min-h-screen" style={{ backgroundColor: '#1d1d1d' }}>
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-sm shadow-lg">
+      <div className="shadow-lg" style={{ backgroundColor: '#141414' }}>
         <div className="max-w-2xl mx-auto px-4 py-6">
           <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-4">
             <ArrowLeft className="w-4 h-4" />
             Назад
           </Link>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="w-16 h-16 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255, 191, 0, 0.2)' }}>
               <Eye className="w-10 h-10 text-white" />
             </div>
             <div className="flex-1">
@@ -169,17 +169,17 @@ export default function SpectatorPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="rounded-2xl shadow-2xl overflow-hidden" style={{ backgroundColor: '#2a2a2a' }}>
             {/* Team Info */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-white text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-4">
-                <Heart className="w-10 h-10" />
+            <div className="p-8 text-white text-center" style={{ backgroundColor: '#373737' }}>
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4" style={{ backgroundColor: 'rgba(255, 191, 0, 0.2)' }}>
+                <Heart className="w-10 h-10" style={{ color: '#FFBF00' }} />
               </div>
               <h2 className="text-3xl font-bold mb-2">{currentTeam.team_name}</h2>
               <p className="text-white/90 text-lg">{currentTeam.nomination_name}</p>
 
               {/* Vote Counter */}
-              <div className="mt-4 inline-flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm">
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full" style={{ backgroundColor: 'rgba(255, 191, 0, 0.2)' }}>
                 <Users className="w-5 h-5" />
                 <span className="font-semibold">{voteCount} {voteCount === 1 ? 'голос' : voteCount < 5 ? 'голоса' : 'голосов'}</span>
               </div>
@@ -188,19 +188,19 @@ export default function SpectatorPage() {
             {/* Scoring */}
             <div className="p-8">
               {hasVoted ? (
-                <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center mb-6">
-                  <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
-                  <p className="text-lg font-semibold text-green-900">Вы уже проголосовали!</p>
-                  <p className="text-sm text-green-700 mt-1">Спасибо за участие в оценке этой команды</p>
+                <div className="rounded-xl p-6 text-center mb-6" style={{ backgroundColor: 'rgba(255, 191, 0, 0.1)', border: '2px solid rgba(255, 191, 0, 0.3)' }}>
+                  <CheckCircle className="w-12 h-12 mx-auto mb-3" style={{ color: '#FFBF00' }} />
+                  <p className="text-lg font-semibold text-white">Вы уже проголосовали!</p>
+                  <p className="text-sm text-gray-300 mt-1">Спасибо за участие в оценке этой команды</p>
                 </div>
               ) : (
                 <>
                   <div className="mb-8">
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-lg font-medium text-gray-700">
+                      <span className="text-lg font-medium text-gray-300">
                         Ваша оценка:
                       </span>
-                      <span className="text-5xl font-bold text-green-600">
+                      <span className="text-5xl font-bold" style={{ color: '#FFBF00' }}>
                         {score.toFixed(1)}
                       </span>
                     </div>
@@ -215,10 +215,10 @@ export default function SpectatorPage() {
                         onChange={(e) => setScore(parseFloat(e.target.value))}
                         className="w-full h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                         style={{
-                          background: `linear-gradient(to right, #10b981 0%, #10b981 ${((score - 0.1) / 9.9) * 100}%, #e5e7eb ${((score - 0.1) / 9.9) * 100}%, #e5e7eb 100%)`
+                          background: `linear-gradient(to right, #FFBF00 0%, #FFBF00 ${((score - 0.1) / 9.9) * 100}%, #4a4a4a ${((score - 0.1) / 9.9) * 100}%, #4a4a4a 100%)`
                         }}
                       />
-                      <div className="flex justify-between text-sm text-gray-600 mt-2">
+                      <div className="flex justify-between text-sm text-gray-400 mt-2">
                         <span>0.1</span>
                         <span>5.0</span>
                         <span>10.0</span>
@@ -229,7 +229,8 @@ export default function SpectatorPage() {
                   <button
                     onClick={handleSubmit}
                     disabled={loading || hasVoted}
-                    className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                    className="w-full py-5 text-black font-bold text-xl rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                    style={{ backgroundColor: '#FFBF00' }}
                   >
                     {loading ? (
                       'Отправка...'
@@ -241,7 +242,7 @@ export default function SpectatorPage() {
                     )}
                   </button>
 
-                  <p className="text-center text-sm text-gray-500 mt-4">
+                  <p className="text-center text-sm text-gray-400 mt-4">
                     Вы можете проголосовать один раз за каждую команду
                   </p>
                 </>

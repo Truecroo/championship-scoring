@@ -92,7 +92,7 @@ export default function ScoreInput({
               className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
               style={{
                 background: value
-                  ? `linear-gradient(to right, #14b8a6 0%, #14b8a6 ${((value - 0.1) / 9.9) * 100}%, #e5e7eb ${((value - 0.1) / 9.9) * 100}%, #e5e7eb 100%)`
+                  ? `linear-gradient(to right, #FF6E00 0%, #FF6E00 ${((value - 0.1) / 9.9) * 100}%, #e5e7eb ${((value - 0.1) / 9.9) * 100}%, #e5e7eb 100%)`
                   : '#e5e7eb'
               }}
             />
