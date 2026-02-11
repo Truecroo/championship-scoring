@@ -93,10 +93,12 @@ export default function AdminPage() {
     loadData()
   }
 
-  const handleSetCurrentTeam = async () => {
-    if (!selectedTeamForCurrent || !selectedNominationForCurrent) return
+  const handleSetCurrentTeam = async (teamId, nominationId) => {
+    const tId = teamId || selectedTeamForCurrent
+    const nId = nominationId || selectedNominationForCurrent
+    if (!tId || !nId) return
 
-    await setCurrentTeam(selectedTeamForCurrent, selectedNominationForCurrent)
+    await setCurrentTeam(tId, nId)
     loadData()
   }
 
@@ -444,11 +446,7 @@ export default function AdminPage() {
                         {nominationTeams.map((team) => (
                           <button
                             key={team.id}
-                            onClick={() => {
-                              setSelectedNominationForCurrent(nomination.id)
-                              setSelectedTeamForCurrent(team.id)
-                              handleSetCurrentTeam()
-                            }}
+                            onClick={() => handleSetCurrentTeam(team.id, nomination.id)}
                             className={`px-4 py-3 text-left rounded-lg border-2 transition-all ${
                               currentTeam?.team_id === team.id
                                 ? 'bg-green-50 border-green-500 text-green-900 font-semibold'

@@ -18,49 +18,19 @@ export default function HomePage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Judge Cards */}
+          {/* Judge Card - single login entry */}
           <Link
-            to="/judge/1"
+            to="/judge-login"
             className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 group"
           >
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-primary-200 transition-colors">
                 <Users className="w-6 h-6 text-primary-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Судья 1</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Судья</h2>
             </div>
             <p className="text-gray-600">
-              Оценка команд по 5 критериям с комментариями
-            </p>
-          </Link>
-
-          <Link
-            to="/judge/2"
-            className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 group"
-          >
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">Судья 2</h2>
-            </div>
-            <p className="text-gray-600">
-              Оценка команд по 5 критериям с комментариями
-            </p>
-          </Link>
-
-          <Link
-            to="/judge/3"
-            className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 group"
-          >
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                <Users className="w-6 h-6 text-purple-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">Судья 3</h2>
-            </div>
-            <p className="text-gray-600">
-              Оценка команд по 5 критериям с комментариями
+              Оценка команд по 4 критериям с комментариями
             </p>
           </Link>
 

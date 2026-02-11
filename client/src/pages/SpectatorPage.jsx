@@ -81,6 +81,15 @@ export default function SpectatorPage() {
     }
   }
 
+  const pluralVotes = (n) => {
+    const abs = Math.abs(n) % 100
+    const lastDigit = abs % 10
+    if (abs > 10 && abs < 20) return 'голосов'
+    if (lastDigit > 1 && lastDigit < 5) return 'голоса'
+    if (lastDigit === 1) return 'голос'
+    return 'голосов'
+  }
+
   const handleSubmit = async () => {
     if (!currentTeam || !fingerprint) return
 
@@ -181,7 +190,7 @@ export default function SpectatorPage() {
               {/* Vote Counter */}
               <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full" style={{ backgroundColor: 'rgba(255, 191, 0, 0.2)' }}>
                 <Users className="w-5 h-5" />
-                <span className="font-semibold">{voteCount} {voteCount === 1 ? 'голос' : voteCount < 5 ? 'голоса' : 'голосов'}</span>
+                <span className="font-semibold">{voteCount} {pluralVotes(voteCount)}</span>
               </div>
             </div>
 
@@ -200,9 +209,19 @@ export default function SpectatorPage() {
                       <span className="text-lg font-medium text-gray-300">
                         Ваша оценка:
                       </span>
-                      <span className="text-5xl font-bold" style={{ color: '#FFBF00' }}>
-                        {score.toFixed(1)}
-                      </span>
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="10.0"
+                        step="0.1"
+                        value={score}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value)
+                          if (!isNaN(val)) setScore(Math.max(0.1, Math.min(10.0, val)))
+                        }}
+                        className="text-5xl font-bold text-center w-32 bg-transparent border-b-2 outline-none"
+                        style={{ color: '#FFBF00', borderColor: '#FFBF00' }}
+                      />
                     </div>
 
                     <div className="relative">
