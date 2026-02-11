@@ -100,21 +100,31 @@ export default function AdminPage() {
     loadData()
   }
 
-  const handleMoveTeamUp = (index) => {
-    if (index === 0) return
+  const handleMoveTeamUp = (teamId, nominationId) => {
+    const nominationTeams = teams.filter(t => t.nomination_id === nominationId)
+    const localIndex = nominationTeams.findIndex(t => t.id === teamId)
+    if (localIndex <= 0) return
+
     const newTeams = [...teams]
-    const temp = newTeams[index]
-    newTeams[index] = newTeams[index - 1]
-    newTeams[index - 1] = temp
+    const globalA = newTeams.findIndex(t => t.id === nominationTeams[localIndex].id)
+    const globalB = newTeams.findIndex(t => t.id === nominationTeams[localIndex - 1].id)
+    const temp = newTeams[globalA]
+    newTeams[globalA] = newTeams[globalB]
+    newTeams[globalB] = temp
     setTeams(newTeams)
   }
 
-  const handleMoveTeamDown = (index) => {
-    if (index === teams.length - 1) return
+  const handleMoveTeamDown = (teamId, nominationId) => {
+    const nominationTeams = teams.filter(t => t.nomination_id === nominationId)
+    const localIndex = nominationTeams.findIndex(t => t.id === teamId)
+    if (localIndex >= nominationTeams.length - 1) return
+
     const newTeams = [...teams]
-    const temp = newTeams[index]
-    newTeams[index] = newTeams[index + 1]
-    newTeams[index + 1] = temp
+    const globalA = newTeams.findIndex(t => t.id === nominationTeams[localIndex].id)
+    const globalB = newTeams.findIndex(t => t.id === nominationTeams[localIndex + 1].id)
+    const temp = newTeams[globalA]
+    newTeams[globalA] = newTeams[globalB]
+    newTeams[globalB] = temp
     setTeams(newTeams)
   }
 
@@ -350,9 +360,7 @@ export default function AdminPage() {
                             <p className="text-center text-gray-400 py-6">Нет команд в этой номинации</p>
                           ) : (
                             <div className="space-y-2">
-                              {nominationTeams.map((team, index) => {
-                                const globalIndex = teams.findIndex(t => t.id === team.id)
-                                return (
+                              {nominationTeams.map((team, index) => (
                                   <div
                                     key={team.id}
                                     className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -365,16 +373,16 @@ export default function AdminPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <button
-                                        onClick={() => handleMoveTeamUp(globalIndex)}
-                                        disabled={globalIndex === 0}
+                                        onClick={() => handleMoveTeamUp(team.id, nomination.id)}
+                                        disabled={index === 0}
                                         className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                         title="Переместить вверх"
                                       >
                                         <ChevronUp className="w-5 h-5" />
                                       </button>
                                       <button
-                                        onClick={() => handleMoveTeamDown(globalIndex)}
-                                        disabled={globalIndex === teams.length - 1}
+                                        onClick={() => handleMoveTeamDown(team.id, nomination.id)}
+                                        disabled={index === nominationTeams.length - 1}
                                         className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                         title="Переместить вниз"
                                       >
@@ -389,8 +397,7 @@ export default function AdminPage() {
                                       </button>
                                     </div>
                                   </div>
-                                )
-                              })}
+                                ))}
                             </div>
                           )}
                         </div>
