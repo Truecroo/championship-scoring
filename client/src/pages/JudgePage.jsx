@@ -337,10 +337,10 @@ export default function JudgePage() {
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Selection */}
-        <div className="rounded-xl shadow-md p-6 mb-6" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Номинация <span className="text-red-500">*</span>
               </label>
               <select
@@ -349,12 +349,7 @@ export default function JudgePage() {
                   setSelectedNomination(e.target.value)
                   setSelectedTeam('')
                 }}
-                className="w-full px-4 py-3 rounded-lg"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: theme.text
-                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="">Выберите номинацию</option>
                 {nominations.map(nom => (
@@ -364,19 +359,14 @@ export default function JudgePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Команда <span className="text-red-500">*</span>
               </label>
               <select
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}
                 disabled={!selectedNomination}
-                className="w-full px-4 py-3 rounded-lg disabled:opacity-50"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: theme.text
-                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
               >
                 <option value="">Выберите команду</option>
                 {teams.map(team => (
@@ -394,11 +384,7 @@ export default function JudgePage() {
               <button
                 onClick={handlePrevTeam}
                 disabled={!canGoPrev}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  color: theme.text
-                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Предыдущая команда
@@ -406,11 +392,7 @@ export default function JudgePage() {
               <button
                 onClick={handleNextTeam}
                 disabled={!canGoNext}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  color: theme.text
-                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Следующая команда
                 <ChevronRight className="w-5 h-5" />
@@ -442,11 +424,7 @@ export default function JudgePage() {
                 <button
                   onClick={handlePrevTeam}
                   disabled={!canGoPrev}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    color: theme.text
-                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5" />
                   Предыдущая команда
@@ -454,11 +432,7 @@ export default function JudgePage() {
                 <button
                   onClick={handleNextTeam}
                   disabled={!canGoNext}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    color: theme.text
-                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Следующая команда
                   <ChevronRight className="w-5 h-5" />
@@ -467,8 +441,8 @@ export default function JudgePage() {
             )}
 
             {/* Auto-save indicator */}
-            <div className="mt-6 rounded-xl shadow-md p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-              <p className="text-sm text-center" style={{ color: theme.text }}>
+            <div className="mt-6 bg-white rounded-xl shadow-md p-4">
+              <p className="text-sm text-gray-600 text-center">
                 ✨ Оценки сохраняются автоматически
               </p>
             </div>
