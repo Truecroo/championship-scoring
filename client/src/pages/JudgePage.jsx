@@ -277,17 +277,16 @@ export default function JudgePage() {
   return (
     <div className="min-h-screen pb-20" style={{ backgroundColor: theme.bg }}>
       {/* Header */}
-      <div style={{ backgroundColor: '#1d1d1d', color: theme.text }} className="shadow-lg">
+      <div style={{ backgroundColor: '#1d1d1d' }} className="shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-4">
-            <Link to="/" className="inline-flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity" style={{ color: theme.text }}>
+            <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-opacity">
               <ArrowLeft className="w-4 h-4" />
               Назад
             </Link>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-              style={{ color: theme.text }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white"
             >
               <LogOut className="w-4 h-4" />
               Выход
@@ -295,11 +294,11 @@ export default function JudgePage() {
           </div>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
-              <Trophy className="w-10 h-10" style={{ color: theme.text }} />
+              <Trophy className="w-10 h-10 text-white" />
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold" style={{ color: theme.text }}>{theme.name}</h1>
-              <p className="opacity-90" style={{ color: theme.text }}>Оценка команд по критериям</p>
+              <h1 className="text-3xl font-bold text-white">{theme.name}</h1>
+              <p className="text-white/90">Оценка команд по критериям</p>
             </div>
           </div>
 
@@ -307,8 +306,8 @@ export default function JudgePage() {
           {selectedNomination && progress.total > 0 && (
             <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium" style={{ color: theme.text }}>Прогресс по номинации</span>
-                <span className="text-sm font-bold" style={{ color: theme.text }}>{progress.scored} / {progress.total}</span>
+                <span className="text-sm font-medium text-white">Прогресс по номинации</span>
+                <span className="text-sm font-bold text-white">{progress.scored} / {progress.total}</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-2.5">
                 <div
@@ -338,10 +337,10 @@ export default function JudgePage() {
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Selection */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="rounded-xl shadow-md p-6 mb-6" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
                 Номинация <span className="text-red-500">*</span>
               </label>
               <select
@@ -350,7 +349,12 @@ export default function JudgePage() {
                   setSelectedNomination(e.target.value)
                   setSelectedTeam('')
                 }}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: theme.text
+                }}
               >
                 <option value="">Выберите номинацию</option>
                 {nominations.map(nom => (
@@ -360,14 +364,19 @@ export default function JudgePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
                 Команда <span className="text-red-500">*</span>
               </label>
               <select
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}
                 disabled={!selectedNomination}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
+                className="w-full px-4 py-3 rounded-lg disabled:opacity-50"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: theme.text
+                }}
               >
                 <option value="">Выберите команду</option>
                 {teams.map(team => (
@@ -385,7 +394,11 @@ export default function JudgePage() {
               <button
                 onClick={handlePrevTeam}
                 disabled={!canGoPrev}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: theme.text
+                }}
               >
                 <ChevronLeft className="w-5 h-5" />
                 Предыдущая команда
@@ -393,7 +406,11 @@ export default function JudgePage() {
               <button
                 onClick={handleNextTeam}
                 disabled={!canGoNext}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: theme.text
+                }}
               >
                 Следующая команда
                 <ChevronRight className="w-5 h-5" />
@@ -425,7 +442,11 @@ export default function JudgePage() {
                 <button
                   onClick={handlePrevTeam}
                   disabled={!canGoPrev}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    color: theme.text
+                  }}
                 >
                   <ChevronLeft className="w-5 h-5" />
                   Предыдущая команда
@@ -433,7 +454,11 @@ export default function JudgePage() {
                 <button
                   onClick={handleNextTeam}
                   disabled={!canGoNext}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-80"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    color: theme.text
+                  }}
                 >
                   Следующая команда
                   <ChevronRight className="w-5 h-5" />
@@ -442,8 +467,8 @@ export default function JudgePage() {
             )}
 
             {/* Auto-save indicator */}
-            <div className="mt-6 bg-white rounded-xl shadow-md p-4">
-              <p className="text-sm text-gray-600 text-center">
+            <div className="mt-6 rounded-xl shadow-md p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+              <p className="text-sm text-center" style={{ color: theme.text }}>
                 ✨ Оценки сохраняются автоматически
               </p>
             </div>
