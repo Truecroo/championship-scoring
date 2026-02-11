@@ -65,6 +65,18 @@ const voteLimiter = rateLimit({
 app.use('/api/', limiter)
 app.use(express.json())
 
+// Simple admin session tokens (in-memory, resets on server restart)
+const adminSessions = new Set()
+
+// Middleware to check admin authorization
+const requireAdmin = (req, res, next) => {
+  const token = req.headers['x-admin-token']
+  if (!token || !adminSessions.has(token)) {
+    return res.status(401).json({ error: 'Требуется авторизация администратора' })
+  }
+  next()
+}
+
 // Criteria weights for score calculation
 const CRITERIA_WEIGHTS = {
   choreography: 0.45,  // 45%
@@ -160,7 +172,12 @@ app.post('/api/auth/admin/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Неверный пароль администратора' })
     }
 
-    res.json({ success: true })
+    // Generate session token
+    const crypto = await import('crypto')
+    const token = crypto.randomBytes(32).toString('hex')
+    adminSessions.add(token)
+
+    res.json({ success: true, token })
   } catch (error) {
     console.error('Admin login error:', error)
     res.status(500).json({ error: error.message })
@@ -183,7 +200,7 @@ app.get('/api/nominations', async (req, res) => {
   }
 })
 
-app.post('/api/nominations', async (req, res) => {
+app.post('/api/nominations', requireAdmin, async (req, res) => {
   try {
     const { name } = req.body
 
@@ -200,7 +217,7 @@ app.post('/api/nominations', async (req, res) => {
   }
 })
 
-app.delete('/api/nominations/:id', async (req, res) => {
+app.delete('/api/nominations/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
@@ -240,7 +257,7 @@ app.get('/api/teams', async (req, res) => {
   }
 })
 
-app.post('/api/teams', async (req, res) => {
+app.post('/api/teams', requireAdmin, async (req, res) => {
   try {
     const { name, nomination_id } = req.body
 
@@ -257,7 +274,7 @@ app.post('/api/teams', async (req, res) => {
   }
 })
 
-app.delete('/api/teams/:id', async (req, res) => {
+app.delete('/api/teams/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
@@ -510,7 +527,7 @@ app.get('/api/current-team', async (req, res) => {
   }
 })
 
-app.post('/api/current-team', async (req, res) => {
+app.post('/api/current-team', requireAdmin, async (req, res) => {
   try {
     const { team_id, nomination_id } = req.body
 

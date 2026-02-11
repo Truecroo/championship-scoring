@@ -8,6 +8,8 @@ export default function SpectatorPage() {
   const [currentTeam, setCurrentTeam] = useState(null)
   const [score, setScore] = useState(5.0)
   const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
+  const [connectionError, setConnectionError] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -45,8 +47,12 @@ export default function SpectatorPage() {
     try {
       const data = await getCurrentTeam()
       setCurrentTeam(data)
+      setConnectionError(false)
     } catch (error) {
       console.error('Error loading current team:', error)
+      setConnectionError(true)
+    } finally {
+      setPageLoading(false)
     }
   }
 
@@ -165,7 +171,31 @@ export default function SpectatorPage() {
       )}
 
       <div className="max-w-2xl mx-auto px-4 py-12">
-        {!currentTeam ? (
+        {pageLoading ? (
+          <div className="rounded-2xl shadow-2xl p-12 text-center" style={{ backgroundColor: '#2a2a2a' }}>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-t-transparent mx-auto mb-6" style={{ borderColor: '#FFBF00', borderTopColor: 'transparent' }}></div>
+            <h2 className="text-xl font-bold text-white">Загрузка...</h2>
+          </div>
+        ) : connectionError ? (
+          <div className="rounded-2xl shadow-2xl p-12 text-center" style={{ backgroundColor: '#2a2a2a' }}>
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: '#3a3a3a' }}>
+              <AlertCircle className="w-12 h-12 text-red-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Нет связи с сервером
+            </h2>
+            <p className="text-gray-400 mb-6">
+              Сервер не отвечает. Возможно, он запускается — подождите немного.
+            </p>
+            <button
+              onClick={() => { setPageLoading(true); loadCurrentTeam() }}
+              className="px-6 py-3 rounded-lg font-semibold text-black"
+              style={{ backgroundColor: '#FFBF00' }}
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : !currentTeam ? (
           <div className="rounded-2xl shadow-2xl p-12 text-center" style={{ backgroundColor: '#2a2a2a' }}>
             <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: '#3a3a3a' }}>
               <AlertCircle className="w-12 h-12 text-gray-400" />

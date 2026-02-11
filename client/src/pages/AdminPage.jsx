@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw, AlertCircle, CheckCircle
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
@@ -25,6 +25,14 @@ export default function AdminPage() {
   const [selectedNominationForTeam, setSelectedNominationForTeam] = useState('')
   const [selectedNominationForCurrent, setSelectedNominationForCurrent] = useState('')
   const [selectedTeamForCurrent, setSelectedTeamForCurrent] = useState('')
+  const [pageLoading, setPageLoading] = useState(true)
+  const [connectionError, setConnectionError] = useState(false)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   useEffect(() => {
     loadData()
@@ -48,14 +56,22 @@ export default function AdminPage() {
   }, [activeTab])
 
   const loadData = async () => {
-    const [nomsData, teamsData, currentData] = await Promise.all([
-      getNominations(),
-      getTeams(),
-      getCurrentTeam()
-    ])
-    setNominations(nomsData)
-    setTeams(teamsData)
-    setCurrentTeamState(currentData)
+    try {
+      const [nomsData, teamsData, currentData] = await Promise.all([
+        getNominations(),
+        getTeams(),
+        getCurrentTeam()
+      ])
+      setNominations(nomsData)
+      setTeams(teamsData)
+      setCurrentTeamState(currentData)
+      setConnectionError(false)
+    } catch (error) {
+      console.error('Error loading data:', error)
+      setConnectionError(true)
+    } finally {
+      setPageLoading(false)
+    }
   }
 
   const loadResults = async () => {
@@ -98,8 +114,13 @@ export default function AdminPage() {
     const nId = nominationId || selectedNominationForCurrent
     if (!tId || !nId) return
 
-    await setCurrentTeam(tId, nId)
-    loadData()
+    try {
+      await setCurrentTeam(tId, nId)
+      await loadData()
+      showToast('Текущая команда переключена')
+    } catch (error) {
+      showToast('Ошибка переключения команды', 'error')
+    }
   }
 
   const handleMoveTeamUp = (teamId, nominationId) => {
@@ -220,7 +241,37 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 ${
+          toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+        }`}>
+          {toast.type === 'error' ? <AlertCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+          <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {pageLoading ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto mb-4" style={{ borderColor: '#FF6E00', borderTopColor: 'transparent' }}></div>
+            <p className="text-gray-600 font-medium">Загрузка данных...</p>
+          </div>
+        ) : connectionError ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Нет связи с сервером</h2>
+            <p className="text-gray-500 mb-6">Сервер не отвечает. Возможно, он запускается — подождите немного.</p>
+            <button
+              onClick={() => { setPageLoading(true); loadData() }}
+              className="px-6 py-3 text-white rounded-lg font-semibold"
+              style={{ backgroundColor: '#FF6E00' }}
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-md mb-6">
           <div className="flex border-b">
@@ -667,6 +718,8 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Trophy, ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
+import { Trophy, ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, LogOut, AlertCircle } from 'lucide-react'
 import { getNominations, getTeams, createScore, updateScore, getScores } from '../utils/api'
 import ScoreInput from '../components/ScoreInput'
 
@@ -23,12 +23,25 @@ export default function JudgePage() {
   const [savedScores, setSavedScores] = useState({}) // Сохраненные оценки для всех команд
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
+  const [connectionError, setConnectionError] = useState(false)
   const saveTimeoutRef = useRef(null)
 
   useEffect(() => {
-    loadNominations()
-    loadAllScores()
+    loadInitialData()
   }, [])
+
+  const loadInitialData = async () => {
+    setPageLoading(true)
+    try {
+      await Promise.all([loadNominations(), loadAllScores()])
+      setConnectionError(false)
+    } catch {
+      setConnectionError(true)
+    } finally {
+      setPageLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (selectedNomination) {
@@ -337,6 +350,26 @@ export default function JudgePage() {
       )}
 
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {pageLoading ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto mb-4" style={{ borderColor: theme.bg, borderTopColor: 'transparent' }}></div>
+            <p className="text-gray-600 font-medium">Загрузка данных...</p>
+          </div>
+        ) : connectionError ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Нет связи с сервером</h2>
+            <p className="text-gray-500 mb-6">Сервер не отвечает. Возможно, он запускается — подождите немного.</p>
+            <button
+              onClick={loadInitialData}
+              className="px-6 py-3 text-white rounded-lg font-semibold"
+              style={{ backgroundColor: theme.bg }}
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Selection */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="grid md:grid-cols-2 gap-4">
@@ -448,6 +481,8 @@ export default function JudgePage() {
               </p>
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </div>

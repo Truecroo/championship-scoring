@@ -42,9 +42,10 @@ export default function AdminLoginPage() {
         throw new Error(data.error || 'Ошибка авторизации')
       }
 
-      // Сохраняем данные администратора в localStorage
+      // Сохраняем данные администратора в localStorage (включая токен для API)
       localStorage.setItem('admin_auth', JSON.stringify({
         authenticated: true,
+        token: data.token,
         timestamp: Date.now()
       }))
 
