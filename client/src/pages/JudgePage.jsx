@@ -5,8 +5,8 @@ import { getNominations, getTeams, createScore, updateScore, getScores } from '.
 import ScoreInput from '../components/ScoreInput'
 
 const CRITERIA = [
-  { key: 'choreography', label: 'Хореография и рисунки', description: 'Сложность и оригинальность постановки', weight: 0.45 },
-  { key: 'technique', label: 'Техника и исполнение', description: 'Точность и качество выполнения', weight: 0.35 },
+  { key: 'choreography', label: 'Хореография и рисунки', description: 'Сложность, оригинальность и актуальность постановки', weight: 0.45 },
+  { key: 'technique', label: 'Техника и исполнение', description: 'Точность и качество выполнения, синхронность и тайминг', weight: 0.35 },
   { key: 'artistry', label: 'Артистизм, образ и костюм', description: 'Сценический образ и презентация', weight: 0.15 },
   { key: 'overall', label: 'Общее впечатление', description: 'Целостность выступления', weight: 0.05 }
 ]
@@ -400,18 +400,33 @@ export default function JudgePage() {
               ))}
             </div>
 
-            {/* Average Display */}
-            <div className="mt-8 bg-white rounded-xl shadow-md p-6">
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-2">Взвешенный балл</p>
-                <p className="text-5xl font-bold text-primary-600 mb-2">{average.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">
-                  Формула: (Хореография×45% + Техника×35% + Артистизм×15% + Общее×5%)
-                </p>
-                <p className="text-xs text-gray-400 mt-3">
-                  ✨ Оценки сохраняются автоматически
-                </p>
+            {/* Navigation buttons at bottom */}
+            {teams.length > 0 && (
+              <div className="mt-8 flex gap-3">
+                <button
+                  onClick={handlePrevTeam}
+                  disabled={!canGoPrev}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                  Предыдущая команда
+                </button>
+                <button
+                  onClick={handleNextTeam}
+                  disabled={!canGoNext}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Следующая команда
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </div>
+            )}
+
+            {/* Auto-save indicator */}
+            <div className="mt-6 bg-white rounded-xl shadow-md p-4">
+              <p className="text-sm text-gray-600 text-center">
+                ✨ Оценки сохраняются автоматически
+              </p>
             </div>
           </>
         )}

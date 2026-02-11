@@ -605,22 +605,48 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Зрительские голоса */}
-                        {topBySpectators && topBySpectators.spectator_votes > 0 && (
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <h4 className="text-sm font-semibold text-green-800 mb-2">🎭 Выбор зрителей</h4>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-bold text-green-900">{topBySpectators.team_name}</p>
-                                <p className="text-sm text-green-700">
-                                  Средняя оценка: {topBySpectators.spectators_avg.toFixed(2)}
-                                  ({topBySpectators.spectator_votes} голосов)
-                                </p>
+                        {/* Зрительские голоса - ТОП-3 */}
+                        {(() => {
+                          const sortedBySpectators = [...nominationResults]
+                            .filter(r => r.spectator_votes > 0)
+                            .sort((a, b) => b.spectators_avg - a.spectators_avg)
+                            .slice(0, 3)
+
+                          if (sortedBySpectators.length === 0) return null
+
+                          return (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-green-800 mb-3">🎭 ТОП-3 по выбору зрителей</h4>
+                              <div className="space-y-2">
+                                {sortedBySpectators.map((result, index) => (
+                                  <div key={result.team_id} className={`flex items-center justify-between p-3 rounded-lg ${
+                                    index === 0 ? 'bg-green-100 border border-green-300' : 'bg-white border border-green-200'
+                                  }`}>
+                                    <div className="flex items-center gap-3">
+                                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                                        index === 0 ? 'bg-green-500 text-white' :
+                                        index === 1 ? 'bg-green-400 text-white' :
+                                        'bg-green-300 text-green-900'
+                                      }`}>
+                                        {index + 1}
+                                      </span>
+                                      <div>
+                                        <p className={`font-bold ${index === 0 ? 'text-green-900' : 'text-gray-900'}`}>
+                                          {result.team_name}
+                                        </p>
+                                        <p className="text-sm text-green-700">
+                                          Средняя оценка: {result.spectators_avg.toFixed(2)}
+                                          <span className="text-green-600"> ({result.spectator_votes} голосов)</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {index === 0 && <Trophy className="w-8 h-8 text-green-600" />}
+                                  </div>
+                                ))}
                               </div>
-                              <Trophy className="w-10 h-10 text-green-600" />
                             </div>
-                          </div>
-                        )}
+                          )
+                        })()}
                       </div>
                     )
                   })}
