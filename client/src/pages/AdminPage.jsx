@@ -439,9 +439,9 @@ export default function AdminPage() {
                   if (nominationTeams.length === 0) return null
 
                   return (
-                    <div key={nomination.id} className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-amber-500" />
+                    <div key={nomination.id} className="rounded-lg p-4" style={{ backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a' }}>
+                      <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                        <Trophy className="w-5 h-5" style={{ color: '#FF6E00' }} />
                         {nomination.name}
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
@@ -453,15 +453,17 @@ export default function AdminPage() {
                               setSelectedTeamForCurrent(team.id)
                               handleSetCurrentTeam()
                             }}
-                            className={`px-4 py-3 text-left rounded-lg border-2 transition-all ${
-                              currentTeam?.team_id === team.id
-                                ? 'bg-green-50 border-green-500 text-green-900 font-semibold'
-                                : 'bg-white border-gray-200 hover:border-amber-400 hover:bg-amber-50'
-                            }`}
+                            className="px-4 py-3 text-left rounded-lg border-2 transition-all"
+                            style={{
+                              backgroundColor: currentTeam?.team_id === team.id ? 'rgba(34, 197, 94, 0.2)' : '#3a3a3a',
+                              borderColor: currentTeam?.team_id === team.id ? '#22c55e' : '#4a4a4a',
+                              color: currentTeam?.team_id === team.id ? '#86efac' : '#fff',
+                              fontWeight: currentTeam?.team_id === team.id ? '600' : '400'
+                            }}
                           >
                             {team.name}
                             {currentTeam?.team_id === team.id && (
-                              <span className="ml-2 text-green-600">●</span>
+                              <span className="ml-2" style={{ color: '#22c55e' }}>●</span>
                             )}
                           </button>
                         ))}

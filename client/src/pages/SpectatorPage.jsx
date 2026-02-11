@@ -157,14 +157,14 @@ export default function SpectatorPage() {
 
       <div className="max-w-2xl mx-auto px-4 py-12">
         {!currentTeam ? (
-          <div className="bg-white rounded-2xl shadow-2xl p-12 text-center">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="rounded-2xl shadow-2xl p-12 text-center" style={{ backgroundColor: '#2a2a2a' }}>
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: '#3a3a3a' }}>
               <AlertCircle className="w-12 h-12 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Нет активной команды
             </h2>
-            <p className="text-gray-600">
+            <p className="text-gray-400">
               Администратор ещё не выбрал команду для голосования
             </p>
           </div>
