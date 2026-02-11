@@ -213,7 +213,7 @@ export default function JudgePage() {
 
   // Навигация по командам (в рамках выбранной номинации)
   const nominationTeams = selectedNomination
-    ? teams.filter(t => t.nomination_id === selectedNomination)
+    ? teams.filter(t => String(t.nomination_id) === String(selectedNomination))
     : teams
 
   const currentTeamIndex = nominationTeams.findIndex(t => t.id === parseInt(selectedTeam))
@@ -267,9 +267,9 @@ export default function JudgePage() {
   const getProgress = () => {
     if (!selectedNomination) return { scored: 0, total: 0, percentage: 0 }
 
-    const nominationTeams = teams.filter(t => t.nomination_id === selectedNomination)
-    const scored = nominationTeams.filter(t => savedScores[t.id]).length
-    const total = nominationTeams.length
+    const nominationTeamsForProgress = teams.filter(t => String(t.nomination_id) === String(selectedNomination))
+    const scored = nominationTeamsForProgress.filter(t => savedScores[t.id]).length
+    const total = nominationTeamsForProgress.length
     const percentage = total > 0 ? Math.round((scored / total) * 100) : 0
 
     return { scored, total, percentage }
