@@ -89,9 +89,9 @@ export default function JudgeLoginPage() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               <option value="">Выберите судью</option>
-              <option value="1">Судья 1</option>
-              <option value="2">Судья 2</option>
-              <option value="3">Судья 3</option>
+              <option value="1">Алинучи</option>
+              <option value="2">Эмиль</option>
+              <option value="3">Алина Черновская</option>
             </select>
           </div>
 
