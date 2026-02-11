@@ -59,9 +59,13 @@ export default function ScoreInput({
             <h3 className="text-lg font-semibold text-gray-900">{label}</h3>
             <p className="text-sm text-gray-600">{description}</p>
           </div>
-          <div className={`text-3xl font-bold px-4 py-2 rounded-lg ${
-            value ? 'bg-primary-50 text-primary-700' : 'bg-gray-100 text-gray-400'
-          }`}>
+          <div
+            className="text-3xl font-bold px-4 py-2 rounded-lg"
+            style={{
+              backgroundColor: value ? '#e5e7eb' : '#f3f4f6',
+              color: value ? '#1f2937' : '#9ca3af'
+            }}
+          >
             {value ? value.toFixed(1) : '—'}
           </div>
         </div>
@@ -89,7 +93,7 @@ export default function ScoreInput({
               step="0.1"
               value={value || 0.1}
               onChange={handleSliderChange}
-              className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-black-thumb"
               style={{
                 background: value
                   ? `linear-gradient(to right, #FF6E00 0%, #FF6E00 ${((value - 0.1) / 9.9) * 100}%, #e5e7eb ${((value - 0.1) / 9.9) * 100}%, #e5e7eb 100%)`
