@@ -213,7 +213,7 @@ export default function JudgePage() {
 
   // Навигация по командам
   // teams уже отфильтрованы по номинации через API getTeams(nominationId)
-  const currentTeamIndex = teams.findIndex(t => t.id === parseInt(selectedTeam))
+  const currentTeamIndex = teams.findIndex(t => String(t.id) === String(selectedTeam))
   const canGoPrev = currentTeamIndex > 0
   const canGoNext = currentTeamIndex < teams.length - 1 && currentTeamIndex !== -1
 
