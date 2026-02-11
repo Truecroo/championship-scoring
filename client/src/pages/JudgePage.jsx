@@ -211,20 +211,24 @@ export default function JudgePage() {
   }
 
 
-  // Навигация по командам
-  const currentTeamIndex = teams.findIndex(t => t.id === parseInt(selectedTeam))
+  // Навигация по командам (в рамках выбранной номинации)
+  const nominationTeams = selectedNomination
+    ? teams.filter(t => t.nomination_id === selectedNomination)
+    : teams
+
+  const currentTeamIndex = nominationTeams.findIndex(t => t.id === parseInt(selectedTeam))
   const canGoPrev = currentTeamIndex > 0
-  const canGoNext = currentTeamIndex < teams.length - 1 && currentTeamIndex !== -1
+  const canGoNext = currentTeamIndex < nominationTeams.length - 1 && currentTeamIndex !== -1
 
   const handlePrevTeam = () => {
     if (canGoPrev) {
-      setSelectedTeam(teams[currentTeamIndex - 1].id.toString())
+      setSelectedTeam(nominationTeams[currentTeamIndex - 1].id.toString())
     }
   }
 
   const handleNextTeam = () => {
     if (canGoNext) {
-      setSelectedTeam(teams[currentTeamIndex + 1].id.toString())
+      setSelectedTeam(nominationTeams[currentTeamIndex + 1].id.toString())
     }
   }
 
@@ -379,7 +383,7 @@ export default function JudgePage() {
           </div>
 
           {/* Team Navigation */}
-          {selectedTeam && teams.length > 0 && (
+          {selectedTeam && nominationTeams.length > 0 && (
             <div className="mt-4 flex gap-3">
               <button
                 onClick={handlePrevTeam}
@@ -419,7 +423,7 @@ export default function JudgePage() {
             </div>
 
             {/* Navigation buttons at bottom */}
-            {teams.length > 0 && (
+            {nominationTeams.length > 0 && (
               <div className="mt-8 flex gap-3">
                 <button
                   onClick={handlePrevTeam}
