@@ -136,10 +136,10 @@ export default function JudgePage() {
       clearTimeout(saveTimeoutRef.current)
     }
 
-    // Запускаем новый таймер (500мс задержка для комментариев)
+    // 300мс задержка — быстро для ползунков, достаточно для debounce комментариев
     saveTimeoutRef.current = setTimeout(() => {
       autoSave(currentScores, currentComments)
-    }, 500)
+    }, 300)
   }
 
   const autoSave = async (currentScores, currentComments) => {
