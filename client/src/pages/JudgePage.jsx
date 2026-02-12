@@ -28,6 +28,8 @@ export default function JudgePage() {
   const [connectionError, setConnectionError] = useState(false)
   const saveTimeoutRef = useRef(null)
   const scoreIdsRef = useRef({}) // team_id -> score DB id (синхронный доступ для race conditions)
+  const savingRef = useRef(false) // блокировка параллельных autoSave
+  const pendingSaveRef = useRef(null) // отложенные данные, если autoSave был заблокирован
 
   useEffect(() => {
     loadInitialData()
@@ -158,6 +160,13 @@ export default function JudgePage() {
 
     if (!hasAnyScore) return
 
+    // Если уже идёт сохранение — откладываем (свежие данные перезапишут)
+    if (savingRef.current) {
+      pendingSaveRef.current = { scores: currentScores, comments: currentComments }
+      return
+    }
+
+    savingRef.current = true
     setSaving(true)
     try {
       const scoreData = {
@@ -205,7 +214,15 @@ export default function JudgePage() {
       setSaveError(true)
       setTimeout(() => setSaveError(false), 4000)
     } finally {
+      savingRef.current = false
       setSaving(false)
+
+      // Если пока сохраняли — пришли новые данные, сохраняем их
+      if (pendingSaveRef.current) {
+        const pending = pendingSaveRef.current
+        pendingSaveRef.current = null
+        autoSave(pending.scores, pending.comments)
+      }
     }
   }
 

@@ -42,9 +42,11 @@ app.use(cors({
 }))
 
 // Rate limiting to prevent abuse
+// 500 requests per 15 min — enough for 3 judges saving simultaneously
+// (each slider change = 1 debounced request, ~40-80 per judge per session)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 500, // limit each IP to 500 requests per windowMs
   message: 'Слишком много запросов с вашего IP, попробуйте позже'
 })
 
