@@ -160,6 +160,16 @@ export const createSpectatorScore = api(
   })
 )
 
+// Lightweight spectator check (vote count + hasVoted)
+export const checkSpectatorVote = api(
+  () => Promise.resolve({ vote_count: 0, has_voted: false }),
+  async (teamId, nominationId, fingerprint) => {
+    const params = new URLSearchParams({ team_id: teamId, nomination_id: nominationId })
+    if (fingerprint) params.append('fingerprint', fingerprint)
+    return safeFetch(`${API_URL}/spectator-scores/check?${params}`)
+  }
+)
+
 // Current Team (for spectators)
 export const getCurrentTeam = api(
   mockApi.getCurrentTeam,

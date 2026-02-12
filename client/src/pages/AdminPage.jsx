@@ -34,6 +34,25 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  // Check admin session expiry on load and periodically
+  useEffect(() => {
+    const checkSession = () => {
+      try {
+        const auth = JSON.parse(localStorage.getItem('admin_auth') || '{}')
+        if (!auth.token || !auth.timestamp || Date.now() - auth.timestamp > 24 * 60 * 60 * 1000) {
+          localStorage.removeItem('admin_auth')
+          navigate('/admin-login')
+        }
+      } catch {
+        localStorage.removeItem('admin_auth')
+        navigate('/admin-login')
+      }
+    }
+    checkSession()
+    const interval = setInterval(checkSession, 60000) // check every minute
+    return () => clearInterval(interval)
+  }, [navigate])
+
   useEffect(() => {
     loadData()
   }, [])

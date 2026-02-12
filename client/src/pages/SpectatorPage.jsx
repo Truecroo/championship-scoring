@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Eye, Heart, Send, CheckCircle, AlertCircle, Users } from 'lucide-react'
-import { getCurrentTeam, createSpectatorScore, getSpectatorScores } from '../utils/api'
+import { getCurrentTeam, createSpectatorScore, checkSpectatorVote } from '../utils/api'
 import FingerprintJS from '@fingerprintjs/fingerprintjs'
 
 export default function SpectatorPage() {
@@ -25,9 +25,6 @@ export default function SpectatorPage() {
         const fp = await FingerprintJS.load()
         const result = await fp.get()
         setFingerprint(result.visitorId)
-
-        // Проверяем, голосовал ли пользователь за текущую команду
-        checkIfVoted(result.visitorId)
       } catch (err) {
         console.error('FingerprintJS error:', err)
         setFingerprintError(true)
@@ -38,19 +35,18 @@ export default function SpectatorPage() {
 
   useEffect(() => {
     loadCurrentTeam()
-    const interval = setInterval(loadCurrentTeam, 5000) // Обновляем каждые 5 секунд
+    const interval = setInterval(loadCurrentTeam, 15000) // Обновляем каждые 15 секунд (600+ зрителей)
     return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
     if (currentTeam && fingerprint) {
-      checkIfVoted(fingerprint)
-      loadVoteCount()
+      loadVoteStatus()
     }
 
-    // Периодически обновляем счётчик голосов
+    // Периодически обновляем счётчик голосов через лёгкий эндпоинт
     if (currentTeam) {
-      const voteInterval = setInterval(loadVoteCount, 10000) // каждые 10 секунд
+      const voteInterval = setInterval(loadVoteStatus, 30000) // каждые 30 секунд (600+ зрителей)
       return () => clearInterval(voteInterval)
     }
   }, [currentTeam, fingerprint])
@@ -76,34 +72,20 @@ export default function SpectatorPage() {
     }
   }
 
-  const loadVoteCount = async () => {
+  // Single lightweight request: vote count + hasVoted check
+  const loadVoteStatus = async () => {
     if (!currentTeam) return
 
     try {
-      const scores = await getSpectatorScores()
-      const teamVotes = scores.filter(s =>
-        s.team_id === currentTeam.team_id &&
-        s.nomination_id === currentTeam.nomination_id
+      const result = await checkSpectatorVote(
+        currentTeam.team_id,
+        currentTeam.nomination_id,
+        fingerprint
       )
-      setVoteCount(teamVotes.length)
+      setVoteCount(result.vote_count)
+      if (fingerprint) setHasVoted(result.has_voted)
     } catch (error) {
-      console.error('Error loading vote count:', error)
-    }
-  }
-
-  const checkIfVoted = async (fp) => {
-    if (!currentTeam || !fp) return
-
-    try {
-      const scores = await getSpectatorScores()
-      const userVote = scores.find(s =>
-        s.team_id === currentTeam.team_id &&
-        s.nomination_id === currentTeam.nomination_id &&
-        s.fingerprint === fp
-      )
-      setHasVoted(!!userVote)
-    } catch (error) {
-      console.error('Error checking vote:', error)
+      console.error('Error loading vote status:', error)
     }
   }
 

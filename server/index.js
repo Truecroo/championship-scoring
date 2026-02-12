@@ -2,10 +2,14 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import bcrypt from 'bcryptjs'
+import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 
 const app = express()
+
+// Security headers
+app.use(helmet())
 const PORT = process.env.PORT || 5001
 
 // Initialize Supabase client with SERVICE ROLE KEY for RLS bypass
@@ -64,17 +68,35 @@ const voteLimiter = rateLimit({
   message: 'Слишком много голосов, подождите немного'
 })
 
+// Higher rate limit for read-only spectator endpoints (600+ concurrent users polling)
+const spectatorReadLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 reads per minute per IP (polling every 15s = 4/min, with margin)
+  message: 'Слишком много запросов, подождите немного'
+})
+
 app.use('/api/', limiter)
 app.use(express.json())
 
-// Simple admin session tokens (in-memory, resets on server restart)
-const adminSessions = new Set()
+// UUID v4 validation
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const isValidUUID = (id) => UUID_REGEX.test(id)
+
+// Admin session tokens with expiry (in-memory, resets on server restart)
+const ADMIN_SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
+const adminSessions = new Map() // token -> { createdAt }
 
 // Middleware to check admin authorization
 const requireAdmin = (req, res, next) => {
   const token = req.headers['x-admin-token']
   if (!token || !adminSessions.has(token)) {
     return res.status(401).json({ error: 'Требуется авторизация администратора' })
+  }
+  // Check expiry
+  const session = adminSessions.get(token)
+  if (Date.now() - session.createdAt > ADMIN_SESSION_TTL) {
+    adminSessions.delete(token)
+    return res.status(401).json({ error: 'Сессия истекла, войдите заново' })
   }
   next()
 }
@@ -109,17 +131,8 @@ app.post('/api/auth/judge/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Неверный ID судьи или пароль' })
     }
 
-    // Check if password starts with $2 (bcrypt hash) or is plaintext
-    let passwordMatch = false
-
-    if (data.password.startsWith('$2')) {
-      // Bcrypt hash - compare securely
-      passwordMatch = await bcrypt.compare(password, data.password)
-    } else {
-      // Plaintext password (backward compatibility during migration)
-      passwordMatch = password === data.password
-      console.warn(`⚠️  Judge ${judge_id} using plaintext password. Please migrate to bcrypt!`)
-    }
+    // Only bcrypt passwords are supported
+    const passwordMatch = await bcrypt.compare(password, data.password)
 
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Неверный ID судьи или пароль' })
@@ -158,26 +171,17 @@ app.post('/api/auth/admin/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Неверный пароль администратора' })
     }
 
-    // Check if password starts with $2 (bcrypt hash) or is plaintext
-    let passwordMatch = false
-
-    if (data.password.startsWith('$2')) {
-      // Bcrypt hash - compare securely
-      passwordMatch = await bcrypt.compare(password, data.password)
-    } else {
-      // Plaintext password (backward compatibility during migration)
-      passwordMatch = password === data.password
-      console.warn('⚠️  Admin using plaintext password. Please migrate to bcrypt!')
-    }
+    // Only bcrypt passwords are supported
+    const passwordMatch = await bcrypt.compare(password, data.password)
 
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Неверный пароль администратора' })
     }
 
-    // Generate session token
+    // Generate session token with expiry tracking
     const crypto = await import('crypto')
     const token = crypto.randomBytes(32).toString('hex')
-    adminSessions.add(token)
+    adminSessions.set(token, { createdAt: Date.now() })
 
     res.json({ success: true, token })
   } catch (error) {
@@ -222,6 +226,7 @@ app.post('/api/nominations', requireAdmin, async (req, res) => {
 app.delete('/api/nominations/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
+    if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
 
     const { error } = await supabase
       .from('nominations')
@@ -280,6 +285,7 @@ app.post('/api/teams', requireAdmin, async (req, res) => {
 app.delete('/api/teams/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
+    if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
 
     const { error } = await supabase
       .from('teams')
@@ -376,11 +382,11 @@ app.post('/api/scores', async (req, res) => {
     for (const [key, weight] of Object.entries(CRITERIA_WEIGHTS)) {
       const val = scores[key]?.score
       if (val != null && val >= 0.1 && val <= 10) {
-        totalWeighted += val * weight
+        totalWeighted += Math.round(val * weight * 10000) / 10000
         totalWeight += weight
       }
     }
-    const weightedAverage = totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
+    const weightedAverage = totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
 
     // Transform frontend format to database format (null for unfilled criteria)
     const scoreData = {
@@ -414,6 +420,7 @@ app.post('/api/scores', async (req, res) => {
 app.put('/api/scores/:id', async (req, res) => {
   try {
     const { id } = req.params
+    if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
     const { scores } = req.body
 
     // Calculate weighted average only from filled criteria (proportional)
@@ -422,11 +429,11 @@ app.put('/api/scores/:id', async (req, res) => {
     for (const [key, weight] of Object.entries(CRITERIA_WEIGHTS)) {
       const val = scores[key]?.score
       if (val != null && val >= 0.1 && val <= 10) {
-        totalWeighted += val * weight
+        totalWeighted += Math.round(val * weight * 10000) / 10000
         totalWeight += weight
       }
     }
-    const weightedAverage = totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
+    const weightedAverage = totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
 
     // Transform frontend format to database format (null for unfilled criteria)
     const scoreData = {
@@ -456,6 +463,7 @@ app.put('/api/scores/:id', async (req, res) => {
 app.delete('/api/scores/:id', async (req, res) => {
   try {
     const { id } = req.params
+    if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
 
     const { error } = await supabase
       .from('scores')
@@ -480,6 +488,45 @@ app.get('/api/spectator-scores', async (req, res) => {
 
     if (error) throw error
     res.json(data)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Lightweight endpoint for spectators: returns vote count + whether this fingerprint voted
+// Avoids sending all spectator_scores to 600+ clients
+app.get('/api/spectator-scores/check', spectatorReadLimiter, async (req, res) => {
+  try {
+    const { team_id, nomination_id, fingerprint } = req.query
+    if (!team_id || !nomination_id) {
+      return res.status(400).json({ error: 'team_id and nomination_id required' })
+    }
+
+    // Count votes for this team
+    const { count, error: countError } = await supabase
+      .from('spectator_scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('team_id', team_id)
+      .eq('nomination_id', nomination_id)
+
+    if (countError) throw countError
+
+    // Check if this fingerprint already voted
+    let hasVoted = false
+    if (fingerprint) {
+      const { data, error: checkError } = await supabase
+        .from('spectator_scores')
+        .select('id')
+        .eq('team_id', team_id)
+        .eq('nomination_id', nomination_id)
+        .eq('fingerprint', fingerprint)
+        .limit(1)
+
+      if (checkError) throw checkError
+      hasVoted = data.length > 0
+    }
+
+    res.json({ vote_count: count, has_voted: hasVoted })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -522,7 +569,7 @@ app.post('/api/spectator-scores', voteLimiter, async (req, res) => {
 
 // ============ CURRENT TEAM ============
 
-app.get('/api/current-team', async (req, res) => {
+app.get('/api/current-team', spectatorReadLimiter, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('current_team')
@@ -599,47 +646,49 @@ app.get('/api/results', async (req, res) => {
 
     if (teamsError) throw teamsError
 
-    // Fetch all scores
+    // Fetch only aggregated data: weighted_average per team (not full rows)
     const { data: scores, error: scoresError } = await supabase
       .from('scores')
-      .select('*')
+      .select('team_id, nomination_id, weighted_average')
 
     if (scoresError) throw scoresError
 
-    // Fetch all spectator scores
+    // Fetch only score values per team (not fingerprints etc.)
     const { data: spectatorScores, error: spectatorError } = await supabase
       .from('spectator_scores')
-      .select('*')
+      .select('team_id, nomination_id, score')
 
     if (spectatorError) throw spectatorError
 
+    // Pre-group scores by team_id+nomination_id for O(1) lookups instead of O(n) per team
+    const judgeMap = new Map()
+    for (const s of scores) {
+      const key = `${s.team_id}|${s.nomination_id}`
+      if (!judgeMap.has(key)) judgeMap.set(key, [])
+      judgeMap.get(key).push(parseFloat(s.weighted_average))
+    }
+
+    const spectatorMap = new Map()
+    for (const s of spectatorScores) {
+      const key = `${s.team_id}|${s.nomination_id}`
+      if (!spectatorMap.has(key)) spectatorMap.set(key, [])
+      spectatorMap.get(key).push(parseFloat(s.score))
+    }
+
     // Calculate results for each team
     const results = teams.map(team => {
-      // Get judge scores for this team
-      const judgeScores = scores.filter(
-        s => s.team_id === team.id && s.nomination_id === team.nomination_id
-      )
+      const key = `${team.id}|${team.nomination_id}`
 
-      // Calculate weighted average for judges
+      const judgeAvgs = judgeMap.get(key) || []
       let judgesWeightedScore = 0
-      if (judgeScores.length > 0) {
-        const judgesTotal = judgeScores.reduce((sum, score) => {
-          return sum + parseFloat(score.weighted_average)
-        }, 0)
-
-        judgesWeightedScore = judgesTotal / judgeScores.length
+      if (judgeAvgs.length > 0) {
+        judgesWeightedScore = judgeAvgs.reduce((a, b) => a + b, 0) / judgeAvgs.length
       }
 
-      // Get spectator scores for this team
-      const teamSpectatorScores = spectatorScores.filter(
-        s => s.team_id === team.id && s.nomination_id === team.nomination_id
-      )
-
+      const specScores = spectatorMap.get(key) || []
       let spectatorsAvg = 0
-      let spectatorVotes = 0
-      if (teamSpectatorScores.length > 0) {
-        spectatorsAvg = teamSpectatorScores.reduce((sum, s) => sum + parseFloat(s.score), 0) / teamSpectatorScores.length
-        spectatorVotes = teamSpectatorScores.length
+      if (specScores.length > 0) {
+        spectatorsAvg = specScores.reduce((a, b) => a + b, 0) / specScores.length
       }
 
       return {
@@ -647,10 +696,10 @@ app.get('/api/results', async (req, res) => {
         team_name: team.name,
         nomination_id: team.nomination_id,
         nomination_name: team.nominations?.name || '',
-        judges_score: judgesWeightedScore,
-        judges_count: judgeScores.length,
-        spectators_avg: spectatorsAvg,
-        spectator_votes: spectatorVotes
+        judges_score: Math.round(judgesWeightedScore * 100) / 100,
+        judges_count: judgeAvgs.length,
+        spectators_avg: Math.round(spectatorsAvg * 100) / 100,
+        spectator_votes: specScores.length
       }
     })
 

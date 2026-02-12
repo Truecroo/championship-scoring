@@ -231,12 +231,11 @@ export default function JudgePage() {
     let totalWeight = 0
     CRITERIA.forEach(c => {
       if (currentScores[c.key] != null && currentScores[c.key] >= 0.1) {
-        totalWeighted += currentScores[c.key] * c.weight
+        totalWeighted += Math.round(currentScores[c.key] * c.weight * 10000) / 10000
         totalWeight += c.weight
       }
     })
-    // Нормализуем по заполненным весам (пропорционально)
-    return totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
+    return totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
   }
 
   const calculateWeightedAverage = () => {
@@ -245,12 +244,12 @@ export default function JudgePage() {
 
     CRITERIA.forEach(c => {
       if (scores[c.key] != null && scores[c.key] >= 0.1) {
-        totalWeighted += scores[c.key] * c.weight
+        totalWeighted += Math.round(scores[c.key] * c.weight * 10000) / 10000
         totalWeight += c.weight
       }
     })
 
-    return totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
+    return totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
   }
 
 
