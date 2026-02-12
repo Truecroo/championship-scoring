@@ -60,9 +60,13 @@ export default function JudgePage() {
       const newComments = {}
 
       CRITERIA.forEach(c => {
-        if (saved.scores[c.key]) {
-          newScores[c.key] = saved.scores[c.key].score
-          newComments[c.key] = saved.scores[c.key].comment
+        if (saved.scores?.[c.key]) {
+          if (saved.scores[c.key].score != null) {
+            newScores[c.key] = saved.scores[c.key].score
+          }
+          if (saved.scores[c.key].comment) {
+            newComments[c.key] = saved.scores[c.key].comment
+          }
         }
       })
 
@@ -142,14 +146,14 @@ export default function JudgePage() {
     // Проверяем, что выбраны номинация и команда
     if (!selectedNomination || !selectedTeam) return
 
-    // Проверяем, что заполнены все оценки
-    const hasAllScores = CRITERIA.every(c =>
+    // Сохраняем если хотя бы один критерий заполнен
+    const hasAnyScore = CRITERIA.some(c =>
       currentScores[c.key] != null &&
       currentScores[c.key] >= 0.1 &&
       currentScores[c.key] <= 10
     )
 
-    if (!hasAllScores) return
+    if (!hasAnyScore) return
 
     setSaving(true)
     try {
@@ -159,7 +163,7 @@ export default function JudgePage() {
         team_id: selectedTeam,
         scores: CRITERIA.reduce((acc, c) => {
           acc[c.key] = {
-            score: currentScores[c.key],
+            score: currentScores[c.key] != null ? currentScores[c.key] : null,
             comment: currentComments[c.key] || ''
           }
           return acc
@@ -200,27 +204,29 @@ export default function JudgePage() {
 
   const calculateWeightedAverageFromScores = (currentScores) => {
     let totalWeighted = 0
+    let totalWeight = 0
     CRITERIA.forEach(c => {
-      if (currentScores[c.key] != null) {
+      if (currentScores[c.key] != null && currentScores[c.key] >= 0.1) {
         totalWeighted += currentScores[c.key] * c.weight
+        totalWeight += c.weight
       }
     })
-    return totalWeighted
+    // Нормализуем по заполненным весам (пропорционально)
+    return totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
   }
 
   const calculateWeightedAverage = () => {
     let totalWeighted = 0
-    let hasAllScores = true
+    let totalWeight = 0
 
     CRITERIA.forEach(c => {
-      if (scores[c.key] != null) {
+      if (scores[c.key] != null && scores[c.key] >= 0.1) {
         totalWeighted += scores[c.key] * c.weight
-      } else {
-        hasAllScores = false
+        totalWeight += c.weight
       }
     })
 
-    return hasAllScores ? totalWeighted : 0
+    return totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
   }
 
 
@@ -278,7 +284,10 @@ export default function JudgePage() {
     if (!selectedNomination) return { scored: 0, total: 0, percentage: 0 }
 
     const nominationTeamsForProgress = teams.filter(t => String(t.nomination_id) === String(selectedNomination))
-    const scored = nominationTeamsForProgress.filter(t => savedScores[t.id]).length
+    const scored = nominationTeamsForProgress.filter(t => {
+      const saved = savedScores[t.id]
+      return saved && CRITERIA.every(c => saved.scores?.[c.key]?.score != null)
+    }).length
     const total = nominationTeamsForProgress.length
     const percentage = total > 0 ? Math.round((scored / total) * 100) : 0
 
@@ -403,11 +412,16 @@ export default function JudgePage() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
               >
                 <option value="">Выберите команду</option>
-                {teams.map(team => (
-                  <option key={team.id} value={team.id}>
-                    {team.name} {savedScores[team.id] && '✓'}
-                  </option>
-                ))}
+                {teams.map(team => {
+                  const saved = savedScores[team.id]
+                  const isComplete = saved && CRITERIA.every(c => saved.scores?.[c.key]?.score != null)
+                  const isPartial = saved && !isComplete
+                  return (
+                    <option key={team.id} value={team.id}>
+                      {team.name} {isComplete ? '✓' : isPartial ? '◐' : ''}
+                    </option>
+                  )
+                })}
               </select>
             </div>
           </div>
@@ -483,7 +497,7 @@ export default function JudgePage() {
             {/* Auto-save indicator */}
             <div className="mt-6 bg-white rounded-xl shadow-md p-4">
               <p className="text-sm text-gray-600 text-center">
-                ✨ Оценки сохраняются автоматически
+                Оценки сохраняются автоматически после каждого изменения
               </p>
             </div>
           </>

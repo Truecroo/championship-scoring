@@ -301,7 +301,7 @@ app.get('/api/scores', async (req, res) => {
 
     if (error) throw error
 
-    // Transform database format to frontend format
+    // Transform database format to frontend format (handle nullable scores)
     const transformedData = data.map(score => ({
       id: score.id,
       judge_id: score.judge_id,
@@ -309,19 +309,19 @@ app.get('/api/scores', async (req, res) => {
       team_id: score.team_id,
       scores: {
         choreography: {
-          score: parseFloat(score.choreography_score),
+          score: score.choreography_score != null ? parseFloat(score.choreography_score) : null,
           comment: score.choreography_comment || ''
         },
         technique: {
-          score: parseFloat(score.technique_score),
+          score: score.technique_score != null ? parseFloat(score.technique_score) : null,
           comment: score.technique_comment || ''
         },
         artistry: {
-          score: parseFloat(score.artistry_score),
+          score: score.artistry_score != null ? parseFloat(score.artistry_score) : null,
           comment: score.artistry_comment || ''
         },
         overall: {
-          score: parseFloat(score.overall_score),
+          score: score.overall_score != null ? parseFloat(score.overall_score) : null,
           comment: score.overall_comment || ''
         }
       },
@@ -340,27 +340,31 @@ app.post('/api/scores', async (req, res) => {
   try {
     const { judge_id, nomination_id, team_id, scores } = req.body
 
-    // Calculate weighted average with proper rounding to fix floating point precision
-    const weightedAverage = Number((
-      scores.choreography.score * CRITERIA_WEIGHTS.choreography +
-      scores.technique.score * CRITERIA_WEIGHTS.technique +
-      scores.artistry.score * CRITERIA_WEIGHTS.artistry +
-      scores.overall.score * CRITERIA_WEIGHTS.overall
-    ).toFixed(2))
+    // Calculate weighted average only from filled criteria (proportional)
+    let totalWeighted = 0
+    let totalWeight = 0
+    for (const [key, weight] of Object.entries(CRITERIA_WEIGHTS)) {
+      const val = scores[key]?.score
+      if (val != null && val >= 0.1 && val <= 10) {
+        totalWeighted += val * weight
+        totalWeight += weight
+      }
+    }
+    const weightedAverage = totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
 
-    // Transform frontend format to database format
+    // Transform frontend format to database format (null for unfilled criteria)
     const scoreData = {
       judge_id,
       nomination_id,
       team_id,
-      choreography_score: scores.choreography.score,
-      choreography_comment: scores.choreography.comment || null,
-      technique_score: scores.technique.score,
-      technique_comment: scores.technique.comment || null,
-      artistry_score: scores.artistry.score,
-      artistry_comment: scores.artistry.comment || null,
-      overall_score: scores.overall.score,
-      overall_comment: scores.overall.comment || null,
+      choreography_score: scores.choreography?.score ?? null,
+      choreography_comment: scores.choreography?.comment || null,
+      technique_score: scores.technique?.score ?? null,
+      technique_comment: scores.technique?.comment || null,
+      artistry_score: scores.artistry?.score ?? null,
+      artistry_comment: scores.artistry?.comment || null,
+      overall_score: scores.overall?.score ?? null,
+      overall_comment: scores.overall?.comment || null,
       weighted_average: weightedAverage
     }
 
@@ -382,24 +386,28 @@ app.put('/api/scores/:id', async (req, res) => {
     const { id } = req.params
     const { scores } = req.body
 
-    // Calculate weighted average with proper rounding to fix floating point precision
-    const weightedAverage = Number((
-      scores.choreography.score * CRITERIA_WEIGHTS.choreography +
-      scores.technique.score * CRITERIA_WEIGHTS.technique +
-      scores.artistry.score * CRITERIA_WEIGHTS.artistry +
-      scores.overall.score * CRITERIA_WEIGHTS.overall
-    ).toFixed(2))
+    // Calculate weighted average only from filled criteria (proportional)
+    let totalWeighted = 0
+    let totalWeight = 0
+    for (const [key, weight] of Object.entries(CRITERIA_WEIGHTS)) {
+      const val = scores[key]?.score
+      if (val != null && val >= 0.1 && val <= 10) {
+        totalWeighted += val * weight
+        totalWeight += weight
+      }
+    }
+    const weightedAverage = totalWeight > 0 ? Number((totalWeighted / totalWeight).toFixed(2)) : 0
 
-    // Transform frontend format to database format
+    // Transform frontend format to database format (null for unfilled criteria)
     const scoreData = {
-      choreography_score: scores.choreography.score,
-      choreography_comment: scores.choreography.comment || null,
-      technique_score: scores.technique.score,
-      technique_comment: scores.technique.comment || null,
-      artistry_score: scores.artistry.score,
-      artistry_comment: scores.artistry.comment || null,
-      overall_score: scores.overall.score,
-      overall_comment: scores.overall.comment || null,
+      choreography_score: scores.choreography?.score ?? null,
+      choreography_comment: scores.choreography?.comment || null,
+      technique_score: scores.technique?.score ?? null,
+      technique_comment: scores.technique?.comment || null,
+      artistry_score: scores.artistry?.score ?? null,
+      artistry_comment: scores.artistry?.comment || null,
+      overall_score: scores.overall?.score ?? null,
+      overall_comment: scores.overall?.comment || null,
       weighted_average: weightedAverage
     }
 

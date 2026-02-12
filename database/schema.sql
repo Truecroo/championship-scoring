@@ -19,24 +19,40 @@ CREATE TABLE IF NOT EXISTS teams (
 );
 
 -- Scores table (оценки судей)
+-- Score columns are nullable to support partial saves (auto-save after each criterion)
 CREATE TABLE IF NOT EXISTS scores (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   judge_id TEXT NOT NULL,
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   nomination_id UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
-  choreography_score NUMERIC(4,2) NOT NULL CHECK (choreography_score >= 0.1 AND choreography_score <= 10),
+  choreography_score NUMERIC(4,2) CHECK (choreography_score IS NULL OR (choreography_score >= 0.1 AND choreography_score <= 10)),
   choreography_comment TEXT,
-  technique_score NUMERIC(4,2) NOT NULL CHECK (technique_score >= 0.1 AND technique_score <= 10),
+  technique_score NUMERIC(4,2) CHECK (technique_score IS NULL OR (technique_score >= 0.1 AND technique_score <= 10)),
   technique_comment TEXT,
-  artistry_score NUMERIC(4,2) NOT NULL CHECK (artistry_score >= 0.1 AND artistry_score <= 10),
+  artistry_score NUMERIC(4,2) CHECK (artistry_score IS NULL OR (artistry_score >= 0.1 AND artistry_score <= 10)),
   artistry_comment TEXT,
-  overall_score NUMERIC(4,2) NOT NULL CHECK (overall_score >= 0.1 AND overall_score <= 10),
+  overall_score NUMERIC(4,2) CHECK (overall_score IS NULL OR (overall_score >= 0.1 AND overall_score <= 10)),
   overall_comment TEXT,
-  weighted_average NUMERIC(5,2) NOT NULL,
+  weighted_average NUMERIC(5,2) NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(judge_id, team_id)
 );
+
+-- Migration: make score columns nullable for partial saves
+-- Run these ALTER statements on existing database:
+-- ALTER TABLE scores ALTER COLUMN choreography_score DROP NOT NULL;
+-- ALTER TABLE scores ALTER COLUMN technique_score DROP NOT NULL;
+-- ALTER TABLE scores ALTER COLUMN artistry_score DROP NOT NULL;
+-- ALTER TABLE scores ALTER COLUMN overall_score DROP NOT NULL;
+-- ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_choreography_score_check;
+-- ALTER TABLE scores ADD CONSTRAINT scores_choreography_score_check CHECK (choreography_score IS NULL OR (choreography_score >= 0.1 AND choreography_score <= 10));
+-- ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_technique_score_check;
+-- ALTER TABLE scores ADD CONSTRAINT scores_technique_score_check CHECK (technique_score IS NULL OR (technique_score >= 0.1 AND technique_score <= 10));
+-- ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_artistry_score_check;
+-- ALTER TABLE scores ADD CONSTRAINT scores_artistry_score_check CHECK (artistry_score IS NULL OR (artistry_score >= 0.1 AND artistry_score <= 10));
+-- ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_overall_score_check;
+-- ALTER TABLE scores ADD CONSTRAINT scores_overall_score_check CHECK (overall_score IS NULL OR (overall_score >= 0.1 AND overall_score <= 10));
 
 -- Spectator scores table (зрительские голоса)
 CREATE TABLE IF NOT EXISTS spectator_scores (
