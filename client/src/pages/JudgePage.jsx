@@ -27,6 +27,7 @@ export default function JudgePage() {
   const [pageLoading, setPageLoading] = useState(true)
   const [connectionError, setConnectionError] = useState(false)
   const saveTimeoutRef = useRef(null)
+  const scoreIdsRef = useRef({}) // team_id -> score DB id (синхронный доступ для race conditions)
 
   useEffect(() => {
     loadInitialData()
@@ -105,6 +106,7 @@ export default function JudgePage() {
       data.forEach(score => {
         if (score.judge_id === judgeId) {
           scoresByTeam[score.team_id] = score
+          if (score.id) scoreIdsRef.current[score.team_id] = score.id
         }
       })
       setSavedScores(scoresByTeam)
@@ -174,16 +176,18 @@ export default function JudgePage() {
       }
 
       // Проверяем существует ли уже оценка для этой команды
-      const existingScore = savedScores[selectedTeam]
+      // Используем ref для синхронного доступа (избегаем race condition с setState)
+      const existingId = scoreIdsRef.current[selectedTeam]
 
-      if (existingScore && existingScore.id) {
+      if (existingId) {
         // UPDATE: оценка уже существует
-        await updateScore(existingScore.id, scoreData)
+        await updateScore(existingId, scoreData)
+        scoreData.id = existingId
       } else {
-        // CREATE: новая оценка
+        // CREATE (upsert на сервере — безопасно при race condition)
         const result = await createScore(scoreData)
-        // Сохраняем ID для будущих обновлений
         scoreData.id = result.id
+        scoreIdsRef.current[selectedTeam] = result.id
       }
 
       // Сохраняем оценки локально

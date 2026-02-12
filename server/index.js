@@ -398,7 +398,7 @@ app.post('/api/scores', async (req, res) => {
 
     const { data, error } = await supabase
       .from('scores')
-      .insert([scoreData])
+      .upsert([scoreData], { onConflict: 'judge_id,team_id' })
       .select()
       .single()
 
