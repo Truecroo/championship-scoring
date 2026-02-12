@@ -23,6 +23,7 @@ export default function JudgePage() {
   const [savedScores, setSavedScores] = useState({}) // Сохраненные оценки для всех команд
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [saveError, setSaveError] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [connectionError, setConnectionError] = useState(false)
   const saveTimeoutRef = useRef(null)
@@ -197,6 +198,8 @@ export default function JudgePage() {
 
     } catch (error) {
       console.error('Error auto-saving scores:', error)
+      setSaveError(true)
+      setTimeout(() => setSaveError(false), 4000)
     } finally {
       setSaving(false)
     }
@@ -236,15 +239,31 @@ export default function JudgePage() {
   const canGoPrev = currentTeamIndex > 0
   const canGoNext = currentTeamIndex < teams.length - 1 && currentTeamIndex !== -1
 
+  const hasIncompleteScores = () => {
+    const hasAny = CRITERIA.some(c => scores[c.key] != null)
+    const hasAll = CRITERIA.every(c => scores[c.key] != null)
+    return hasAny && !hasAll
+  }
+
+  const confirmNavigate = (targetTeamId) => {
+    if (hasIncompleteScores()) {
+      const filled = CRITERIA.filter(c => scores[c.key] != null).length
+      if (!confirm(`Заполнено ${filled} из ${CRITERIA.length} критериев. Перейти к другой команде?`)) {
+        return
+      }
+    }
+    setSelectedTeam(targetTeamId)
+  }
+
   const handlePrevTeam = () => {
     if (canGoPrev) {
-      setSelectedTeam(teams[currentTeamIndex - 1].id.toString())
+      confirmNavigate(teams[currentTeamIndex - 1].id.toString())
     }
   }
 
   const handleNextTeam = () => {
     if (canGoNext) {
-      setSelectedTeam(teams[currentTeamIndex + 1].id.toString())
+      confirmNavigate(teams[currentTeamIndex + 1].id.toString())
     }
   }
 
@@ -358,6 +377,13 @@ export default function JudgePage() {
         </div>
       )}
 
+      {saveError && (
+        <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
+          <AlertCircle className="w-5 h-5" />
+          <span className="font-medium">Ошибка сохранения! Попробуйте ещё раз</span>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 py-8">
         {pageLoading ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
@@ -407,7 +433,13 @@ export default function JudgePage() {
               </label>
               <select
                 value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value && hasIncompleteScores()) {
+                    const filled = CRITERIA.filter(c => scores[c.key] != null).length
+                    if (!confirm(`Заполнено ${filled} из ${CRITERIA.length} критериев. Перейти к другой команде?`)) return
+                  }
+                  setSelectedTeam(e.target.value)
+                }}
                 disabled={!selectedNomination}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
               >

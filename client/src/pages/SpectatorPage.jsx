@@ -14,18 +14,24 @@ export default function SpectatorPage() {
   const [error, setError] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [fingerprint, setFingerprint] = useState(null)
+  const [fingerprintError, setFingerprintError] = useState(false)
   const [voteCount, setVoteCount] = useState(0)
   const [hasVoted, setHasVoted] = useState(false)
 
   useEffect(() => {
     // Получаем fingerprint при загрузке
     const loadFingerprint = async () => {
-      const fp = await FingerprintJS.load()
-      const result = await fp.get()
-      setFingerprint(result.visitorId)
+      try {
+        const fp = await FingerprintJS.load()
+        const result = await fp.get()
+        setFingerprint(result.visitorId)
 
-      // Проверяем, голосовал ли пользователь за текущую команду
-      checkIfVoted(result.visitorId)
+        // Проверяем, голосовал ли пользователь за текущую команду
+        checkIfVoted(result.visitorId)
+      } catch (err) {
+        console.error('FingerprintJS error:', err)
+        setFingerprintError(true)
+      }
     }
     loadFingerprint()
   }, [])
@@ -40,6 +46,12 @@ export default function SpectatorPage() {
     if (currentTeam && fingerprint) {
       checkIfVoted(fingerprint)
       loadVoteCount()
+    }
+
+    // Периодически обновляем счётчик голосов
+    if (currentTeam) {
+      const voteInterval = setInterval(loadVoteCount, 10000) // каждые 10 секунд
+      return () => clearInterval(voteInterval)
     }
   }, [currentTeam, fingerprint])
 
@@ -234,7 +246,20 @@ export default function SpectatorPage() {
 
             {/* Scoring */}
             <div className="p-8">
-              {hasVoted ? (
+              {fingerprintError ? (
+                <div className="rounded-xl p-6 text-center mb-6" style={{ backgroundColor: 'rgba(255, 80, 80, 0.1)', border: '2px solid rgba(255, 80, 80, 0.3)' }}>
+                  <AlertCircle className="w-12 h-12 mx-auto mb-3 text-red-400" />
+                  <p className="text-lg font-semibold text-white">Не удалось идентифицировать устройство</p>
+                  <p className="text-sm text-gray-300 mt-1">Попробуйте обновить страницу или используйте другой браузер</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="mt-4 px-6 py-3 rounded-lg font-semibold text-black"
+                    style={{ backgroundColor: '#FFBF00' }}
+                  >
+                    Обновить страницу
+                  </button>
+                </div>
+              ) : hasVoted ? (
                 <div className="rounded-xl p-6 text-center mb-6" style={{ backgroundColor: 'rgba(255, 191, 0, 0.1)', border: '2px solid rgba(255, 191, 0, 0.3)' }}>
                   <CheckCircle className="w-12 h-12 mx-auto mb-3" style={{ color: '#FFBF00' }} />
                   <p className="text-lg font-semibold text-white">Вы уже проголосовали!</p>

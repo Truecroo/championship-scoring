@@ -96,6 +96,16 @@ export const deleteTeam = api(
   })
 )
 
+// Reorder teams
+export const reorderTeams = api(
+  () => Promise.resolve(), // mock: no-op
+  async (teamIds) => safeFetch(`${API_URL}/teams/reorder`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify({ team_ids: teamIds })
+  })
+)
+
 // Scores
 export const getScores = api(
   mockApi.getScores,

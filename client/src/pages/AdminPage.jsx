@@ -6,8 +6,8 @@ import {
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
-  getTeams, createTeam, deleteTeam,
-  getResults, setCurrentTeam, getCurrentTeam
+  getTeams, createTeam, deleteTeam, reorderTeams,
+  getResults, setCurrentTeam, getCurrentTeam, getScores
 } from '../utils/api'
 import * as XLSX from 'xlsx'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -89,7 +89,26 @@ export default function AdminPage() {
   }
 
   const handleDeleteNomination = async (id) => {
-    if (!confirm('Удалить эту номинацию? Все связанные команды тоже будут удалены.')) return
+    // Check if nomination has scores
+    try {
+      const allScores = await getScores()
+      const nominationScores = allScores.filter(s => s.nomination_id === id)
+      const nominationTeams = teams.filter(t => t.nomination_id === id)
+
+      let message = 'Удалить эту номинацию?'
+      if (nominationTeams.length > 0 || nominationScores.length > 0) {
+        message = `Удалить эту номинацию? Будут удалены: ${nominationTeams.length} команд`
+        if (nominationScores.length > 0) {
+          message += ` и ${nominationScores.length} оценок судей`
+        }
+        message += '. Это действие необратимо!'
+      }
+
+      if (!confirm(message)) return
+    } catch {
+      if (!confirm('Удалить эту номинацию? Все связанные данные тоже будут удалены.')) return
+    }
+
     await deleteNomination(id)
     loadData()
   }
@@ -123,7 +142,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleMoveTeamUp = (teamId, nominationId) => {
+  const handleMoveTeamUp = async (teamId, nominationId) => {
     const nominationTeams = teams.filter(t => t.nomination_id === nominationId)
     const localIndex = nominationTeams.findIndex(t => t.id === teamId)
     if (localIndex <= 0) return
@@ -135,9 +154,13 @@ export default function AdminPage() {
     newTeams[globalA] = newTeams[globalB]
     newTeams[globalB] = temp
     setTeams(newTeams)
+
+    // Persist new order to DB
+    const reordered = newTeams.filter(t => t.nomination_id === nominationId).map(t => t.id)
+    try { await reorderTeams(reordered) } catch (e) { console.error('Reorder failed:', e) }
   }
 
-  const handleMoveTeamDown = (teamId, nominationId) => {
+  const handleMoveTeamDown = async (teamId, nominationId) => {
     const nominationTeams = teams.filter(t => t.nomination_id === nominationId)
     const localIndex = nominationTeams.findIndex(t => t.id === teamId)
     if (localIndex >= nominationTeams.length - 1) return
@@ -149,6 +172,10 @@ export default function AdminPage() {
     newTeams[globalA] = newTeams[globalB]
     newTeams[globalB] = temp
     setTeams(newTeams)
+
+    // Persist new order to DB
+    const reordered = newTeams.filter(t => t.nomination_id === nominationId).map(t => t.id)
+    try { await reorderTeams(reordered) } catch (e) { console.error('Reorder failed:', e) }
   }
 
   const handleExportExcel = () => {

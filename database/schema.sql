@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   nomination_id UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
+  display_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -38,6 +39,9 @@ CREATE TABLE IF NOT EXISTS scores (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(judge_id, team_id)
 );
+
+-- Migration: add display_order column to teams
+-- ALTER TABLE teams ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 -- Migration: make score columns nullable for partial saves
 -- Run these ALTER statements on existing database:
