@@ -398,12 +398,12 @@ export default function AdminPage() {
 
                     return (
                       <div key={nomination.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                        <div className="px-6 py-4" style={{ backgroundColor: '#FF6E00' }}>
+                        <div className="px-6 py-4 bg-gray-800">
                           <h3 className="text-xl font-bold text-white flex items-center gap-2">
                             <Trophy className="w-6 h-6" />
                             {nomination.name}
                           </h3>
-                          <p className="text-white/90 text-sm mt-1">
+                          <p className="text-white/70 text-sm mt-1">
                             Команд: {nominationTeams.length}
                           </p>
                         </div>
@@ -418,7 +418,7 @@ export default function AdminPage() {
                                     key={team.id}
                                     className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                                   >
-                                    <div className="flex-shrink-0 w-10 h-10 text-white rounded-full flex items-center justify-center font-bold text-lg" style={{ backgroundColor: '#FF6E00' }}>
+                                    <div className="flex-shrink-0 w-10 h-10 text-white rounded-full flex items-center justify-center font-bold text-lg bg-gray-700">
                                       {index + 1}
                                     </div>
                                     <div className="flex-1">
@@ -500,13 +500,14 @@ export default function AdminPage() {
                             onClick={() => handleSetCurrentTeam(team.id, nomination.id)}
                             className={`px-4 py-3 text-left rounded-lg border-2 transition-all ${
                               currentTeam?.team_id === team.id
-                                ? 'bg-green-50 border-green-500 text-green-900 font-semibold'
+                                ? 'border-green-500 text-green-900 font-semibold'
                                 : 'bg-white border-gray-200 hover:border-orange-400 hover:bg-orange-50'
                             }`}
+                            style={currentTeam?.team_id === team.id ? { backgroundColor: '#FFF3E6', borderColor: '#FF6E00' } : {}}
                           >
                             {team.name}
                             {currentTeam?.team_id === team.id && (
-                              <span className="ml-2 text-green-600">●</span>
+                              <span className="ml-2" style={{ color: '#FF6E00' }}>●</span>
                             )}
                           </button>
                         ))}
@@ -668,51 +669,52 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Зрительские голоса - ТОП-3 */}
-                        {(() => {
-                          const sortedBySpectators = [...nominationResults]
-                            .filter(r => r.spectator_votes > 0)
-                            .sort((a, b) => b.spectators_avg - a.spectators_avg)
-                            .slice(0, 3)
-
-                          if (sortedBySpectators.length === 0) return null
-
-                          return (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                              <h4 className="text-sm font-semibold text-amber-800 mb-3">🎭 ТОП-3 по выбору зрителей</h4>
-                              <div className="space-y-2">
-                                {sortedBySpectators.map((result, index) => (
-                                  <div key={result.team_id} className={`flex items-center justify-between p-3 rounded-lg ${
-                                    index === 0 ? 'bg-amber-100 border border-amber-300' : 'bg-white border border-amber-200'
-                                  }`}>
-                                    <div className="flex items-center gap-3">
-                                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
-                                        index === 0 ? 'bg-amber-500 text-white' :
-                                        index === 1 ? 'bg-amber-400 text-white' :
-                                        'bg-amber-300 text-amber-900'
-                                      }`}>
-                                        {index + 1}
-                                      </span>
-                                      <div>
-                                        <p className={`font-bold ${index === 0 ? 'text-amber-900' : 'text-gray-900'}`}>
-                                          {result.team_name}
-                                        </p>
-                                        <p className="text-sm text-amber-700">
-                                          Средняя оценка: {result.spectators_avg.toFixed(2)}
-                                          <span className="text-amber-600"> ({result.spectator_votes} голосов)</span>
-                                        </p>
-                                      </div>
-                                    </div>
-                                    {index === 0 && <Trophy className="w-8 h-8 text-amber-600" />}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        })()}
                       </div>
                     )
                   })}
+
+                  {/* Зрительские голоса - общая таблица */}
+                  {(() => {
+                    const allSpectatorResults = results
+                      .filter(r => r.spectator_votes > 0)
+                      .sort((a, b) => b.spectators_avg - a.spectators_avg)
+                      .slice(0, 5)
+
+                    if (allSpectatorResults.length === 0) return null
+
+                    return (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="text-lg font-bold text-amber-800 mb-3">ТОП-5 по выбору зрителей</h4>
+                        <div className="space-y-2">
+                          {allSpectatorResults.map((result, index) => (
+                            <div key={result.team_id} className={`flex items-center justify-between p-3 rounded-lg ${
+                              index === 0 ? 'bg-amber-100 border border-amber-300' : 'bg-white border border-amber-200'
+                            }`}>
+                              <div className="flex items-center gap-3">
+                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                                  index === 0 ? 'bg-amber-500 text-white' :
+                                  index === 1 ? 'bg-amber-400 text-white' :
+                                  'bg-amber-300 text-amber-900'
+                                }`}>
+                                  {index + 1}
+                                </span>
+                                <div>
+                                  <p className={`font-bold ${index === 0 ? 'text-amber-900' : 'text-gray-900'}`}>
+                                    {result.team_name}
+                                  </p>
+                                  <p className="text-sm text-amber-700">
+                                    {result.nomination_name} — {result.spectators_avg.toFixed(2)}
+                                    <span className="text-amber-600"> ({result.spectator_votes} голосов)</span>
+                                  </p>
+                                </div>
+                              </div>
+                              {index === 0 && <Trophy className="w-8 h-8 text-amber-600" />}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>

@@ -438,6 +438,12 @@ export default function JudgePage() {
         {/* Scoring */}
         {selectedTeam && (
           <>
+            {/* Sticky team name */}
+            <div className="sticky top-0 z-40 -mx-4 px-4 py-3 mb-6 shadow-md rounded-b-xl" style={{ backgroundColor: theme.bg }}>
+              <p className="text-center font-bold text-lg" style={{ color: theme.text }}>
+                {teams.find(t => String(t.id) === String(selectedTeam))?.name}
+              </p>
+            </div>
             <div className="space-y-6">
               {CRITERIA.map((criterion) => (
                 <ScoreInput

@@ -46,7 +46,15 @@ export default function SpectatorPage() {
   const loadCurrentTeam = async () => {
     try {
       const data = await getCurrentTeam()
-      setCurrentTeam(data)
+      setCurrentTeam(prev => {
+        // Если команда реально изменилась — сбросить состояние голосования
+        if (prev?.team_id !== data?.team_id) {
+          setHasVoted(false)
+          setScore(5.0)
+          setVoteCount(0)
+        }
+        return data
+      })
       setConnectionError(false)
     } catch (error) {
       console.error('Error loading current team:', error)
