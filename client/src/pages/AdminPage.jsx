@@ -138,7 +138,13 @@ export default function AdminPage() {
       await loadData()
       showToast('Текущая команда переключена')
     } catch (error) {
-      showToast('Ошибка переключения команды', 'error')
+      if (error.message?.includes('401') || error.message?.includes('авторизац')) {
+        showToast('Сессия истекла. Войдите заново', 'error')
+        localStorage.removeItem('admin_auth')
+        setTimeout(() => navigate('/admin-login'), 1500)
+      } else {
+        showToast('Ошибка переключения команды', 'error')
+      }
     }
   }
 

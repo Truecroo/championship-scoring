@@ -27,10 +27,19 @@ function adminHeaders() {
   }
 }
 
+// Auto-redirect to login on 401 for admin requests
+function handleAdminAuthError(res, options) {
+  if (res.status === 401 && options?.headers?.['X-Admin-Token']) {
+    localStorage.removeItem('admin_auth')
+    window.location.href = window.location.origin + (import.meta.env.BASE_URL || '/') + 'admin-login'
+  }
+}
+
 // Safe fetch wrapper — throws on HTTP errors instead of silently returning error body
 async function safeFetch(url, options) {
   const res = await fetch(url, options)
   if (!res.ok) {
+    handleAdminAuthError(res, options)
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `Ошибка сервера (${res.status})`)
   }
@@ -40,6 +49,7 @@ async function safeFetch(url, options) {
 async function safeFetchNoBody(url, options) {
   const res = await fetch(url, options)
   if (!res.ok) {
+    handleAdminAuthError(res, options)
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `Ошибка сервера (${res.status})`)
   }
