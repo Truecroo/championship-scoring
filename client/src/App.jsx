@@ -5,6 +5,8 @@ import SpectatorPage from './pages/SpectatorPage'
 import HomePage from './pages/HomePage'
 import JudgeLoginPage from './pages/JudgeLoginPage'
 import AdminLoginPage from './pages/AdminLoginPage'
+import ModeratorLoginPage from './pages/ModeratorLoginPage'
+import ModeratorPage from './pages/ModeratorPage'
 
 // Protected Route для судей
 function ProtectedJudgeRoute({ children }) {
@@ -60,6 +62,27 @@ function ProtectedAdminRoute({ children }) {
   return children
 }
 
+// Protected Route для модератора
+function ProtectedModeratorRoute({ children }) {
+  const auth = localStorage.getItem('moderator_auth')
+
+  if (!auth) {
+    return <Navigate to="/moderator-login" replace />
+  }
+
+  try {
+    const authData = JSON.parse(auth)
+    if (Date.now() - authData.timestamp > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('moderator_auth')
+      return <Navigate to="/moderator-login" replace />
+    }
+  } catch {
+    return <Navigate to="/moderator-login" replace />
+  }
+
+  return children
+}
+
 function App() {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -70,6 +93,7 @@ function App() {
         {/* Страницы логина */}
         <Route path="/judge-login" element={<JudgeLoginPage />} />
         <Route path="/admin-login" element={<AdminLoginPage />} />
+        <Route path="/moderator-login" element={<ModeratorLoginPage />} />
 
         {/* Прямая ссылка для зрителей (без логина) */}
         <Route path="/vote" element={<SpectatorPage />} />
@@ -89,6 +113,15 @@ function App() {
             <ProtectedAdminRoute>
               <AdminPage />
             </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/moderator"
+          element={
+            <ProtectedModeratorRoute>
+              <ModeratorPage />
+            </ProtectedModeratorRoute>
           }
         />
 

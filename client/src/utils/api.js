@@ -27,11 +27,31 @@ function adminHeaders() {
   }
 }
 
+// Get moderator token from localStorage
+function getModeratorToken() {
+  try {
+    const auth = JSON.parse(localStorage.getItem('moderator_auth') || '{}')
+    return auth.token || ''
+  } catch { return '' }
+}
+
+// Headers with moderator auth
+function moderatorHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'X-Moderator-Token': getModeratorToken()
+  }
+}
+
 // Auto-redirect to login on 401 for admin requests
 function handleAdminAuthError(res, options) {
   if (res.status === 401 && options?.headers?.['X-Admin-Token']) {
     localStorage.removeItem('admin_auth')
     window.location.href = window.location.origin + (import.meta.env.BASE_URL || '/') + 'admin-login'
+  }
+  if (res.status === 401 && options?.headers?.['X-Moderator-Token']) {
+    localStorage.removeItem('moderator_auth')
+    window.location.href = window.location.origin + (import.meta.env.BASE_URL || '/') + 'moderator-login'
   }
 }
 
@@ -91,10 +111,19 @@ export const getTeams = api(
 
 export const createTeam = api(
   mockApi.createTeam,
-  async (name, nominationId) => safeFetch(`${API_URL}/teams`, {
+  async (name, nominationId, penalty = 0) => safeFetch(`${API_URL}/teams`, {
     method: 'POST',
     headers: adminHeaders(),
-    body: JSON.stringify({ name, nomination_id: nominationId })
+    body: JSON.stringify({ name, nomination_id: nominationId, penalty })
+  })
+)
+
+export const updateTeamPenalty = api(
+  () => Promise.resolve(),
+  async (id, penalty) => safeFetch(`${API_URL}/teams/${id}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify({ penalty })
   })
 )
 
@@ -181,6 +210,22 @@ export const setCurrentTeam = api(
   async (teamId, nominationId) => safeFetch(`${API_URL}/current-team`, {
     method: 'POST',
     headers: adminHeaders(),
+    body: JSON.stringify({ team_id: teamId, nomination_id: nominationId })
+  })
+)
+
+// Judges (admin only)
+export const getJudges = api(
+  () => Promise.resolve([{ id: '1', name: 'Судья 1' }, { id: '2', name: 'Судья 2' }, { id: '3', name: 'Судья 3' }]),
+  async () => safeFetch(`${API_URL}/judges`, { headers: adminHeaders() })
+)
+
+// Moderator: switch current team
+export const setCurrentTeamModerator = api(
+  mockApi.setCurrentTeam,
+  async (teamId, nominationId) => safeFetch(`${API_URL}/current-team`, {
+    method: 'POST',
+    headers: moderatorHeaders(),
     body: JSON.stringify({ team_id: teamId, nomination_id: nominationId })
   })
 )

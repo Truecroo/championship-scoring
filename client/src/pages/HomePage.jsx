@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Trophy, Users, Eye, Settings } from 'lucide-react'
+import { Trophy, Users, Eye, Settings, Monitor } from 'lucide-react'
 
 export default function HomePage() {
   return (
@@ -17,7 +17,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid sm:grid-cols-2 gap-6">
           {/* Judge Card - single login entry */}
           <Link
             to="/judge-login"
@@ -50,10 +50,26 @@ export default function HomePage() {
             </p>
           </Link>
 
-          {/* Admin - Full Width */}
+          {/* Moderator */}
+          <Link
+            to="/moderator"
+            className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 group"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                <Monitor className="w-6 h-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Модератор</h2>
+            </div>
+            <p className="text-white/90">
+              Переключение команд для голосования
+            </p>
+          </Link>
+
+          {/* Admin */}
           <Link
             to="/admin"
-            className="md:col-span-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 group"
+            className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 group"
           >
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">

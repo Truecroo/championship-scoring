@@ -61,17 +61,19 @@ const authLimiter = rateLimit({
   message: 'Слишком много попыток входа, попробуйте позже'
 })
 
-// Stricter rate limit for voting
+// Rate limit for voting — high limit per IP because 600+ spectators may share WiFi at venue
+// Real duplicate protection is via fingerprint unique constraint in DB, not rate limiting
 const voteLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 20, // limit each IP to 20 votes per 5 minutes
+  max: 300, // 300 votes per 5 min per IP (enough for 600 users on same WiFi, each votes once)
   message: 'Слишком много голосов, подождите немного'
 })
 
-// Higher rate limit for read-only spectator endpoints (600+ concurrent users polling)
+// High rate limit for read-only spectator endpoints (600+ concurrent users on same WiFi polling)
+// Each spectator polls ~6 req/min, on shared WiFi 600 users = 3600 req/min from 1 IP
 const spectatorReadLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // 30 reads per minute per IP (polling every 15s = 4/min, with margin)
+  max: 4000, // 600 users × 6 req/min + safety margin
   message: 'Слишком много запросов, подождите немного'
 })
 
@@ -86,6 +88,10 @@ const isValidUUID = (id) => UUID_REGEX.test(id)
 const ADMIN_SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
 const adminSessions = new Map() // token -> { createdAt }
 
+// Moderator session tokens (same pattern as admin)
+const MODERATOR_SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
+const moderatorSessions = new Map() // token -> { createdAt }
+
 // Middleware to check admin authorization
 const requireAdmin = (req, res, next) => {
   const token = req.headers['x-admin-token']
@@ -99,6 +105,29 @@ const requireAdmin = (req, res, next) => {
     return res.status(401).json({ error: 'Сессия истекла, войдите заново' })
   }
   next()
+}
+
+// Middleware: moderator OR admin can access
+const requireModeratorOrAdmin = (req, res, next) => {
+  // Check moderator token
+  const modToken = req.headers['x-moderator-token']
+  if (modToken && moderatorSessions.has(modToken)) {
+    const session = moderatorSessions.get(modToken)
+    if (Date.now() - session.createdAt <= MODERATOR_SESSION_TTL) {
+      return next()
+    }
+    moderatorSessions.delete(modToken)
+  }
+  // Fallback: check admin token
+  const adminToken = req.headers['x-admin-token']
+  if (adminToken && adminSessions.has(adminToken)) {
+    const session = adminSessions.get(adminToken)
+    if (Date.now() - session.createdAt <= ADMIN_SESSION_TTL) {
+      return next()
+    }
+    adminSessions.delete(adminToken)
+  }
+  return res.status(401).json({ error: 'Требуется авторизация' })
 }
 
 // Criteria weights for score calculation
@@ -190,6 +219,57 @@ app.post('/api/auth/admin/login', authLimiter, async (req, res) => {
   }
 })
 
+app.post('/api/auth/moderator/login', authLimiter, async (req, res) => {
+  try {
+    const { password } = req.body
+
+    if (!password) {
+      return res.status(400).json({ error: 'Пароль обязателен' })
+    }
+
+    const { data, error } = await supabase
+      .from('moderator_auth')
+      .select('id, password')
+      .eq('id', 1)
+      .single()
+
+    if (error || !data) {
+      return res.status(401).json({ error: 'Неверный пароль модератора' })
+    }
+
+    const passwordMatch = await bcrypt.compare(password, data.password)
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Неверный пароль модератора' })
+    }
+
+    const crypto = await import('crypto')
+    const token = crypto.randomBytes(32).toString('hex')
+    moderatorSessions.set(token, { createdAt: Date.now() })
+
+    res.json({ success: true, token })
+  } catch (error) {
+    console.error('Moderator login error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// ============ JUDGES (admin only) ============
+
+app.get('/api/judges', requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('judge_auth')
+      .select('id, name')
+      .order('id', { ascending: true })
+
+    if (error) throw error
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 // ============ NOMINATIONS ============
 
 app.get('/api/nominations', async (req, res) => {
@@ -267,16 +347,34 @@ app.get('/api/teams', async (req, res) => {
 
 app.post('/api/teams', requireAdmin, async (req, res) => {
   try {
-    const { name, nomination_id } = req.body
+    const { name, nomination_id, penalty } = req.body
 
     const { data, error } = await supabase
       .from('teams')
-      .insert([{ name, nomination_id }])
+      .insert([{ name, nomination_id, penalty: penalty || 0 }])
       .select()
       .single()
 
     if (error) throw error
     res.json(data)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.put('/api/teams/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
+
+    const { penalty } = req.body
+    const { error } = await supabase
+      .from('teams')
+      .update({ penalty: penalty ?? 0 })
+      .eq('id', id)
+
+    if (error) throw error
+    res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -612,7 +710,7 @@ app.get('/api/current-team', spectatorReadLimiter, async (req, res) => {
   }
 })
 
-app.post('/api/current-team', requireAdmin, async (req, res) => {
+app.post('/api/current-team', requireModeratorOrAdmin, async (req, res) => {
   try {
     const { team_id, nomination_id } = req.body
 
@@ -632,13 +730,14 @@ app.post('/api/current-team', requireAdmin, async (req, res) => {
 
 app.get('/api/results', async (req, res) => {
   try {
-    // Fetch all teams with their nominations
+    // Fetch all teams with their nominations (including penalty)
     const { data: teams, error: teamsError } = await supabase
       .from('teams')
       .select(`
         id,
         name,
         nomination_id,
+        penalty,
         nominations (
           name
         )
@@ -691,13 +790,15 @@ app.get('/api/results', async (req, res) => {
         spectatorsAvg = specScores.reduce((a, b) => a + b, 0) / specScores.length
       }
 
+      const penalty = parseFloat(team.penalty || 0)
       return {
         team_id: team.id,
         team_name: team.name,
         nomination_id: team.nomination_id,
         nomination_name: team.nominations?.name || '',
-        judges_score: Math.round(judgesWeightedScore * 100) / 100,
+        judges_score: Math.round((judgesWeightedScore + penalty) * 100) / 100,
         judges_count: judgeAvgs.length,
+        penalty,
         spectators_avg: Math.round(spectatorsAvg * 100) / 100,
         spectator_votes: specScores.length
       }

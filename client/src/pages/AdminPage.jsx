@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw, AlertCircle, CheckCircle
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw, AlertCircle, CheckCircle, Pencil, ChevronRight
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
-  getTeams, createTeam, deleteTeam, reorderTeams,
-  getResults, setCurrentTeam, getCurrentTeam, getScores
+  getTeams, createTeam, deleteTeam, reorderTeams, updateTeamPenalty,
+  getResults, setCurrentTeam, getCurrentTeam, getScores, getJudges
 } from '../utils/api'
 import * as XLSX from 'xlsx'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -20,8 +20,13 @@ export default function AdminPage() {
   const [results, setResults] = useState([])
   const [currentTeam, setCurrentTeamState] = useState(null)
 
+  const [allScores, setAllScores] = useState([])
+  const [judges, setJudges] = useState([])
+  const [expandedTeam, setExpandedTeam] = useState(null)
+
   const [newNominationName, setNewNominationName] = useState('')
   const [newTeamName, setNewTeamName] = useState('')
+  const [newTeamPenalty, setNewTeamPenalty] = useState('')
   const [selectedNominationForTeam, setSelectedNominationForTeam] = useState('')
   const [selectedNominationForCurrent, setSelectedNominationForCurrent] = useState('')
   const [selectedTeamForCurrent, setSelectedTeamForCurrent] = useState('')
@@ -94,8 +99,20 @@ export default function AdminPage() {
   }
 
   const loadResults = async () => {
-    const data = await getResults()
-    setResults(data)
+    try {
+      const [data, scoresData, judgesData] = await Promise.all([
+        getResults(),
+        getScores(),
+        getJudges()
+      ])
+      setResults(data)
+      setAllScores(scoresData)
+      setJudges(judgesData)
+    } catch (error) {
+      console.error('Error loading results:', error)
+      const data = await getResults().catch(() => [])
+      setResults(data)
+    }
   }
 
   const handleCreateNomination = async (e) => {
@@ -116,11 +133,12 @@ export default function AdminPage() {
 
       let message = 'Удалить эту номинацию?'
       if (nominationTeams.length > 0 || nominationScores.length > 0) {
-        message = `Удалить эту номинацию? Будут удалены: ${nominationTeams.length} команд`
+        const parts = [`${nominationTeams.length} команд`]
         if (nominationScores.length > 0) {
-          message += ` и ${nominationScores.length} оценок судей`
+          parts.push(`${nominationScores.length} оценок судей`)
         }
-        message += '. Это действие необратимо!'
+        parts.push('все голоса зрителей')
+        message = `Удалить эту номинацию? Будут удалены: ${parts.join(', ')}. Это действие необратимо!`
       }
 
       if (!confirm(message)) return
@@ -136,13 +154,48 @@ export default function AdminPage() {
     e.preventDefault()
     if (!newTeamName.trim() || !selectedNominationForTeam) return
 
-    await createTeam(newTeamName, selectedNominationForTeam)
+    await createTeam(newTeamName, selectedNominationForTeam, parseFloat(newTeamPenalty) || 0)
     setNewTeamName('')
+    setNewTeamPenalty('')
     loadData()
   }
 
+  const handleEditPenalty = async (teamId, currentPenalty) => {
+    const input = prompt('Введите штраф (например -0.5, 0 для отмены):', String(currentPenalty || 0))
+    if (input === null) return
+    const penalty = parseFloat(input)
+    if (isNaN(penalty)) {
+      showToast('Некорректное значение штрафа', 'error')
+      return
+    }
+    try {
+      await updateTeamPenalty(teamId, penalty)
+      showToast(penalty === 0 ? 'Штраф убран' : `Штраф установлен: ${penalty}`)
+      loadData()
+    } catch (error) {
+      showToast('Ошибка сохранения штрафа', 'error')
+    }
+  }
+
   const handleDeleteTeam = async (id) => {
-    if (!confirm('Удалить эту команду?')) return
+    // Подсчитываем связанные данные для предупреждения
+    let message = 'Удалить эту команду?'
+    try {
+      const allScores = await getScores()
+      const teamScores = allScores.filter(s => s.team_id === id)
+      const isCurrentTeam = currentTeam?.team_id === id
+      const parts = []
+      if (teamScores.length > 0) parts.push(`${teamScores.length} оценок судей`)
+      if (parts.length > 0 || isCurrentTeam) {
+        message = `Удалить эту команду? Будут удалены: ${parts.join(' и ')}.`
+        if (isCurrentTeam) message += ' Эта команда сейчас активна для голосования!'
+        message += ' Голоса зрителей тоже будут удалены. Это действие необратимо!'
+      }
+    } catch {
+      message = 'Удалить эту команду? Все оценки судей и голоса зрителей тоже будут удалены.'
+    }
+
+    if (!confirm(message)) return
     await deleteTeam(id)
     loadData()
   }
@@ -172,6 +225,7 @@ export default function AdminPage() {
     const localIndex = nominationTeams.findIndex(t => t.id === teamId)
     if (localIndex <= 0) return
 
+    const prevTeams = teams
     const newTeams = [...teams]
     const globalA = newTeams.findIndex(t => t.id === nominationTeams[localIndex].id)
     const globalB = newTeams.findIndex(t => t.id === nominationTeams[localIndex - 1].id)
@@ -180,9 +234,15 @@ export default function AdminPage() {
     newTeams[globalB] = temp
     setTeams(newTeams)
 
-    // Persist new order to DB
+    // Persist new order to DB, rollback on error
     const reordered = newTeams.filter(t => t.nomination_id === nominationId).map(t => t.id)
-    try { await reorderTeams(reordered) } catch (e) { console.error('Reorder failed:', e) }
+    try {
+      await reorderTeams(reordered)
+    } catch (e) {
+      console.error('Reorder failed:', e)
+      setTeams(prevTeams)
+      showToast('Ошибка сохранения порядка команд', 'error')
+    }
   }
 
   const handleMoveTeamDown = async (teamId, nominationId) => {
@@ -190,6 +250,7 @@ export default function AdminPage() {
     const localIndex = nominationTeams.findIndex(t => t.id === teamId)
     if (localIndex >= nominationTeams.length - 1) return
 
+    const prevTeams = teams
     const newTeams = [...teams]
     const globalA = newTeams.findIndex(t => t.id === nominationTeams[localIndex].id)
     const globalB = newTeams.findIndex(t => t.id === nominationTeams[localIndex + 1].id)
@@ -198,9 +259,15 @@ export default function AdminPage() {
     newTeams[globalB] = temp
     setTeams(newTeams)
 
-    // Persist new order to DB
+    // Persist new order to DB, rollback on error
     const reordered = newTeams.filter(t => t.nomination_id === nominationId).map(t => t.id)
-    try { await reorderTeams(reordered) } catch (e) { console.error('Reorder failed:', e) }
+    try {
+      await reorderTeams(reordered)
+    } catch (e) {
+      console.error('Reorder failed:', e)
+      setTeams(prevTeams)
+      showToast('Ошибка сохранения порядка команд', 'error')
+    }
   }
 
   const handleExportExcel = () => {
@@ -229,6 +296,7 @@ export default function AdminPage() {
         'Место': index + 1,
         'Команда': r.team_name,
         'Балл судей': r.judges_score.toFixed(2),
+        'Штраф': r.penalty || 0,
         'Кол-во судей': r.judges_count,
         'Балл зрителей': r.spectators_avg.toFixed(2),
         'Голосов зрителей': r.spectator_votes
@@ -237,6 +305,38 @@ export default function AdminPage() {
       const ws = XLSX.utils.json_to_sheet(data)
       XLSX.utils.book_append_sheet(wb, ws, nominationName.substring(0, 31)) // Excel limit 31 chars
     })
+
+    // Детальный лист с оценками по судьям
+    if (allScores.length > 0) {
+      const detailData = []
+      Object.entries(resultsByNomination).forEach(([nominationName, nominationResults]) => {
+        const sorted = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
+        sorted.forEach(r => {
+          const teamScores = allScores.filter(s => s.team_id === r.team_id && s.nomination_id === r.nomination_id)
+          teamScores.forEach(score => {
+            const judgeName = judges.find(j => String(j.id) === String(score.judge_id))?.name || `Судья ${score.judge_id}`
+            detailData.push({
+              'Номинация': nominationName,
+              'Команда': r.team_name,
+              'Судья': judgeName,
+              'Хореография': score.scores.choreography.score ?? '',
+              'Комм. хорео': score.scores.choreography.comment || '',
+              'Техника': score.scores.technique.score ?? '',
+              'Комм. техника': score.scores.technique.comment || '',
+              'Артистизм': score.scores.artistry.score ?? '',
+              'Комм. артистизм': score.scores.artistry.comment || '',
+              'Общее': score.scores.overall.score ?? '',
+              'Комм. общее': score.scores.overall.comment || '',
+              'Средневзвеш.': score.average?.toFixed(2) ?? ''
+            })
+          })
+        })
+      })
+      if (detailData.length > 0) {
+        const ws = XLSX.utils.json_to_sheet(detailData)
+        XLSX.utils.book_append_sheet(wb, ws, 'Подробные оценки')
+      }
+    }
 
     // Сохраняем файл
     const timestamp = new Date().toISOString().split('T')[0]
@@ -428,6 +528,15 @@ export default function AdminPage() {
                     style={{ focusRingColor: '#FF6E00' }}
                     required
                   />
+                  <input
+                    type="number"
+                    value={newTeamPenalty}
+                    onChange={(e) => setNewTeamPenalty(e.target.value)}
+                    placeholder="Штраф, напр. -0.5"
+                    step="0.1"
+                    className="w-40 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2"
+                    style={{ focusRingColor: '#FF6E00' }}
+                  />
                   <button
                     type="submit"
                     disabled={!selectedNominationForTeam || !newTeamName.trim()}
@@ -474,9 +583,21 @@ export default function AdminPage() {
                                       {index + 1}
                                     </div>
                                     <div className="flex-1">
-                                      <p className="font-semibold text-gray-800">{team.name}</p>
+                                      <p className="font-semibold text-gray-800">
+                                        {team.name}
+                                        {team.penalty != null && team.penalty !== 0 && (
+                                          <span className="ml-2 text-sm font-normal text-red-600">({team.penalty > 0 ? '+' : ''}{team.penalty})</span>
+                                        )}
+                                      </p>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleEditPenalty(team.id, team.penalty)}
+                                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                                        title="Изменить штраф"
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </button>
                                       <button
                                         onClick={() => handleMoveTeamUp(team.id, nomination.id)}
                                         disabled={index === 0}
@@ -689,33 +810,108 @@ export default function AdminPage() {
                                   <th className="px-4 py-3 text-left text-sm font-semibold">Место</th>
                                   <th className="px-4 py-3 text-left text-sm font-semibold">Команда</th>
                                   <th className="px-4 py-3 text-right text-sm font-semibold">Балл</th>
+                                  {sortedByJudges.some(r => r.penalty !== 0) && (
+                                    <th className="px-4 py-3 text-right text-sm font-semibold text-red-600">Штраф</th>
+                                  )}
                                   <th className="px-4 py-3 text-right text-sm font-semibold">Судей</th>
+                                  <th className="px-4 py-3 w-10"></th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {sortedByJudges.map((result, index) => (
-                                  <tr key={result.team_id} className="border-b">
-                                    <td className="px-4 py-3">
-                                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
-                                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                                        index === 1 ? 'bg-gray-300 text-gray-900' :
-                                        index === 2 ? 'bg-orange-400 text-orange-900' :
-                                        'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {index + 1}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3 font-medium">{result.team_name}</td>
-                                    <td className="px-4 py-3 text-right">
-                                      <span className="font-bold text-lg" style={{ color: '#FF6E00' }}>
-                                        {result.judges_score?.toFixed(2) || '—'}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-gray-600">
-                                      {result.judges_count || 0}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {sortedByJudges.map((result, index) => {
+                                  const teamScores = allScores.filter(s => s.team_id === result.team_id && s.nomination_id === result.nomination_id)
+                                  const isExpanded = expandedTeam === `${result.team_id}|${result.nomination_id}`
+                                  const hasPenaltyColumn = sortedByJudges.some(r => r.penalty !== 0)
+
+                                  return (
+                                    <React.Fragment key={result.team_id}>
+                                      <tr className="border-b cursor-pointer hover:bg-gray-50" onClick={() => setExpandedTeam(isExpanded ? null : `${result.team_id}|${result.nomination_id}`)}>
+                                        <td className="px-4 py-3">
+                                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                                            index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                            index === 1 ? 'bg-gray-300 text-gray-900' :
+                                            index === 2 ? 'bg-orange-400 text-orange-900' :
+                                            'bg-gray-100 text-gray-700'
+                                          }`}>
+                                            {index + 1}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 font-medium">{result.team_name}</td>
+                                        <td className="px-4 py-3 text-right">
+                                          <span className="font-bold text-lg" style={{ color: '#FF6E00' }}>
+                                            {result.judges_score?.toFixed(2) || '—'}
+                                          </span>
+                                        </td>
+                                        {hasPenaltyColumn && (
+                                          <td className="px-4 py-3 text-right text-red-600 font-medium">
+                                            {result.penalty !== 0 ? result.penalty : ''}
+                                          </td>
+                                        )}
+                                        <td className="px-4 py-3 text-right text-gray-600">
+                                          {result.judges_count || 0}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                        </td>
+                                      </tr>
+                                      {isExpanded && teamScores.length > 0 && (
+                                        <tr>
+                                          <td colSpan={hasPenaltyColumn ? 6 : 5} className="px-4 py-3 bg-gray-50">
+                                            <table className="w-full text-sm">
+                                              <thead>
+                                                <tr className="text-gray-500">
+                                                  <th className="px-3 py-2 text-left font-medium">Судья</th>
+                                                  <th className="px-3 py-2 text-center font-medium">Хорео (45%)</th>
+                                                  <th className="px-3 py-2 text-center font-medium">Техника (35%)</th>
+                                                  <th className="px-3 py-2 text-center font-medium">Артистизм (15%)</th>
+                                                  <th className="px-3 py-2 text-center font-medium">Общее (5%)</th>
+                                                  <th className="px-3 py-2 text-center font-medium">Средневз.</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {teamScores.map(score => {
+                                                  const judgeName = judges.find(j => String(j.id) === String(score.judge_id))?.name || `Судья ${score.judge_id}`
+                                                  return (
+                                                    <tr key={score.judge_id} className="border-t border-gray-200">
+                                                      <td className="px-3 py-2 font-medium text-gray-800">{judgeName}</td>
+                                                      <td className="px-3 py-2 text-center">
+                                                        {score.scores.choreography.score?.toFixed(1) || '—'}
+                                                        {score.scores.choreography.comment && (
+                                                          <p className="text-xs text-gray-400 mt-0.5">{score.scores.choreography.comment}</p>
+                                                        )}
+                                                      </td>
+                                                      <td className="px-3 py-2 text-center">
+                                                        {score.scores.technique.score?.toFixed(1) || '—'}
+                                                        {score.scores.technique.comment && (
+                                                          <p className="text-xs text-gray-400 mt-0.5">{score.scores.technique.comment}</p>
+                                                        )}
+                                                      </td>
+                                                      <td className="px-3 py-2 text-center">
+                                                        {score.scores.artistry.score?.toFixed(1) || '—'}
+                                                        {score.scores.artistry.comment && (
+                                                          <p className="text-xs text-gray-400 mt-0.5">{score.scores.artistry.comment}</p>
+                                                        )}
+                                                      </td>
+                                                      <td className="px-3 py-2 text-center">
+                                                        {score.scores.overall.score?.toFixed(1) || '—'}
+                                                        {score.scores.overall.comment && (
+                                                          <p className="text-xs text-gray-400 mt-0.5">{score.scores.overall.comment}</p>
+                                                        )}
+                                                      </td>
+                                                      <td className="px-3 py-2 text-center font-bold" style={{ color: '#FF6E00' }}>
+                                                        {score.average?.toFixed(2) || '—'}
+                                                      </td>
+                                                    </tr>
+                                                  )
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  )
+                                })}
                               </tbody>
                             </table>
                           </div>

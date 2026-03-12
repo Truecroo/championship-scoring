@@ -147,7 +147,9 @@ export default function JudgePage() {
     }, 300)
   }
 
-  const autoSave = async (currentScores, currentComments) => {
+  const autoSave = async (currentScores, currentComments, retryCount = 0) => {
+    const MAX_RETRIES = 2
+
     // Проверяем, что выбраны номинация и команда
     if (!selectedNomination || !selectedTeam) return
 
@@ -211,6 +213,15 @@ export default function JudgePage() {
 
     } catch (error) {
       console.error('Error auto-saving scores:', error)
+
+      // Retry с задержкой при сетевой ошибке
+      if (retryCount < MAX_RETRIES) {
+        savingRef.current = false
+        setSaving(false)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return autoSave(currentScores, currentComments, retryCount + 1)
+      }
+
       setSaveError(true)
       setTimeout(() => setSaveError(false), 4000)
     } finally {
