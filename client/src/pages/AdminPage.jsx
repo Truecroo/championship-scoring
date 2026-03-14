@@ -119,9 +119,13 @@ export default function AdminPage() {
     e.preventDefault()
     if (!newNominationName.trim()) return
 
-    await createNomination(newNominationName)
-    setNewNominationName('')
-    loadData()
+    try {
+      await createNomination(newNominationName)
+      setNewNominationName('')
+      loadData()
+    } catch (error) {
+      showToast('Ошибка создания номинации', 'error')
+    }
   }
 
   const handleDeleteNomination = async (id) => {
@@ -146,18 +150,26 @@ export default function AdminPage() {
       if (!confirm('Удалить эту номинацию? Все связанные данные тоже будут удалены.')) return
     }
 
-    await deleteNomination(id)
-    loadData()
+    try {
+      await deleteNomination(id)
+      loadData()
+    } catch (error) {
+      showToast('Ошибка удаления номинации', 'error')
+    }
   }
 
   const handleCreateTeam = async (e) => {
     e.preventDefault()
     if (!newTeamName.trim() || !selectedNominationForTeam) return
 
-    await createTeam(newTeamName, selectedNominationForTeam, parseFloat(newTeamPenalty) || 0)
-    setNewTeamName('')
-    setNewTeamPenalty('')
-    loadData()
+    try {
+      await createTeam(newTeamName, selectedNominationForTeam, parseFloat(newTeamPenalty) || 0)
+      setNewTeamName('')
+      setNewTeamPenalty('')
+      loadData()
+    } catch (error) {
+      showToast('Ошибка создания команды', 'error')
+    }
   }
 
   const handleEditPenalty = async (teamId, currentPenalty) => {
@@ -196,8 +208,12 @@ export default function AdminPage() {
     }
 
     if (!confirm(message)) return
-    await deleteTeam(id)
-    loadData()
+    try {
+      await deleteTeam(id)
+      loadData()
+    } catch (error) {
+      showToast('Ошибка удаления команды', 'error')
+    }
   }
 
   const handleSetCurrentTeam = async (teamId, nominationId) => {
