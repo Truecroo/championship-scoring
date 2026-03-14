@@ -10,6 +10,9 @@ import {
   getResults, setCurrentTeam, getCurrentTeam, getScores, getJudges
 } from '../utils/api'
 import * as XLSX from 'xlsx'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import pdfFonts from 'pdfmake/build/vfs_fonts'
 import { QRCodeCanvas } from 'qrcode.react'
 
 export default function AdminPage() {
@@ -357,6 +360,191 @@ export default function AdminPage() {
     // Сохраняем файл
     const timestamp = new Date().toISOString().split('T')[0]
     XLSX.writeFile(wb, `Результаты_чемпионата_${timestamp}.xlsx`)
+  }
+
+  const handleExportPDF = () => {
+    if (results.length === 0 || allScores.length === 0) {
+      alert('Нет данных для экспорта PDF (нужны оценки судей)')
+      return
+    }
+
+    const CRITERIA = [
+      { key: 'choreography', label: 'Хореография и рисунки', weight: '45%' },
+      { key: 'technique', label: 'Техника и исполнение', weight: '35%' },
+      { key: 'artistry', label: 'Артистизм, образ и костюм', weight: '15%' },
+      { key: 'overall', label: 'Общее впечатление', weight: '5%' },
+    ]
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+
+    // Load Roboto fonts from pdfmake's vfs
+    const vfs = pdfFonts.pdfMake ? pdfFonts.pdfMake.vfs : pdfFonts
+    doc.addFileToVFS('Roboto-Regular.ttf', vfs['Roboto-Regular.ttf'])
+    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal')
+    doc.addFileToVFS('Roboto-Medium.ttf', vfs['Roboto-Medium.ttf'])
+    doc.addFont('Roboto-Medium.ttf', 'Roboto', 'bold')
+    doc.setFont('Roboto')
+
+    // Group results by nomination
+    const resultsByNomination = results.reduce((acc, r) => {
+      if (!acc[r.nomination_name]) acc[r.nomination_name] = []
+      acc[r.nomination_name].push(r)
+      return acc
+    }, {})
+
+    let isFirstPage = true
+
+    Object.entries(resultsByNomination).forEach(([nominationName, nominationResults]) => {
+      const sorted = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
+
+      sorted.forEach(result => {
+        // Get scores for this team from all judges
+        const teamScores = allScores.filter(
+          s => s.team_id === result.team_id && s.nomination_id === result.nomination_id
+        )
+        if (teamScores.length === 0) return
+
+        if (!isFirstPage) doc.addPage()
+        isFirstPage = false
+
+        const teamJudges = teamScores.map(s => {
+          const judgeName = judges.find(j => String(j.id) === String(s.judge_id))?.name || `Судья ${s.judge_id}`
+          return { name: judgeName, scores: s.scores }
+        })
+
+        const judgeCount = teamJudges.length
+        const teamPenalty = result.penalty || 0
+        const finalScore = result.judges_score
+
+        // --- Header ---
+        doc.setFont('Roboto', 'bold')
+        doc.setFontSize(11)
+        doc.setTextColor(150, 150, 150)
+        doc.text('БЛЭСТ ЧЕМП 2026', 148.5, 12, { align: 'center' })
+
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(22)
+        doc.text('СУДЕЙСКИЙ ЛИСТ', 148.5, 22, { align: 'center' })
+
+        doc.setFont('Roboto', 'normal')
+        doc.setFontSize(14)
+        doc.text(`Команда: ${result.team_name}`, 14, 33)
+        doc.text(`Номинация: ${nominationName}`, 283, 33, { align: 'right' })
+
+        // --- Build table ---
+        const head = [['Критерий', 'Вес', ...teamJudges.map(j => j.name)]]
+        const body = []
+
+        CRITERIA.forEach(({ key, label, weight }) => {
+          const row = [
+            { content: label, styles: { fontStyle: 'bold' } },
+            { content: weight, styles: { halign: 'center' } },
+          ]
+          teamJudges.forEach(j => {
+            const val = j.scores[key]
+            const scoreStr = val?.score != null ? Number(val.score).toFixed(1) : '—'
+            const comment = val?.comment || ''
+            row.push({ content: comment ? scoreStr + '\n' + comment : scoreStr, styles: { halign: 'center' } })
+          })
+          body.push(row)
+        })
+
+        const criteriaRowCount = CRITERIA.length
+        const hasPenalty = teamPenalty !== 0
+
+        if (hasPenalty) {
+          body.push([
+            'Штраф',
+            '',
+            { content: String(teamPenalty), colSpan: judgeCount, styles: { halign: 'center' } }
+          ])
+        }
+
+        body.push([
+          'ИТОГО',
+          '',
+          { content: finalScore.toFixed(2), colSpan: judgeCount, styles: { halign: 'center' } }
+        ])
+
+        const totalRows = body.length
+
+        autoTable(doc, {
+          startY: 39,
+          head,
+          body,
+          theme: 'grid',
+          styles: { font: 'Roboto', fontSize: 11, cellPadding: 4, valign: 'top', minCellHeight: 18 },
+          headStyles: { fillColor: [29, 29, 29], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12, halign: 'center' },
+          columnStyles: {
+            0: { cellWidth: 58, fontStyle: 'bold' },
+            1: { cellWidth: 16, halign: 'center' },
+          },
+          didParseCell: function(data) {
+            if (data.section !== 'body') return
+            const ri = data.row.index
+
+            if (hasPenalty && ri === totalRows - 2) {
+              data.cell.styles.fillColor = [254, 242, 242]
+              data.cell.styles.fontStyle = 'bold'
+              data.cell.styles.textColor = [220, 38, 38]
+              data.cell.styles.fontSize = 13
+            }
+
+            if (ri === totalRows - 1) {
+              data.cell.styles.fillColor = [239, 246, 255]
+              data.cell.styles.fontStyle = 'bold'
+              data.cell.styles.fontSize = 16
+              if (data.column.index >= 2) data.cell.styles.textColor = [30, 64, 175]
+            }
+
+            if (ri < criteriaRowCount && ri % 2 === 1) {
+              data.cell.styles.fillColor = [245, 247, 250]
+            }
+
+            if (ri < criteriaRowCount && data.column.index >= 2) {
+              data.cell.text = []
+            }
+          },
+          didDrawCell: function(data) {
+            if (data.section !== 'body') return
+            const ri = data.row.index
+            if (ri >= criteriaRowCount || data.column.index < 2) return
+
+            const criterionKey = CRITERIA[ri].key
+            const judgeIdx = data.column.index - 2
+            const val = teamJudges[judgeIdx]?.scores[criterionKey]
+            if (!val) return
+
+            const x = data.cell.x + data.cell.width / 2
+
+            doc.setFont('Roboto', 'bold')
+            doc.setFontSize(14)
+            doc.setTextColor(0, 0, 0)
+            const scoreY = data.cell.y + 7
+            doc.text(val.score != null ? Number(val.score).toFixed(1) : '—', x, scoreY, { align: 'center' })
+
+            if (val.comment) {
+              doc.setFont('Roboto', 'normal')
+              doc.setFontSize(7)
+              doc.setTextColor(120, 120, 120)
+              const maxWidth = data.cell.width - 4
+              const lines = doc.splitTextToSize(val.comment, maxWidth)
+              doc.text(lines, x, scoreY + 5, { align: 'center' })
+            }
+          },
+        })
+
+        // Footer
+        const pageHeight = doc.internal.pageSize.getHeight()
+        doc.setFont('Roboto', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(180, 180, 180)
+        doc.text('БЛЭСТ ЧЕМП 2026 — Судейский протокол', 148.5, pageHeight - 8, { align: 'center' })
+      })
+    })
+
+    const timestamp = new Date().toISOString().split('T')[0]
+    doc.save(`Судейские_листы_${timestamp}.pdf`)
   }
 
   const handleLogout = () => {
@@ -741,6 +929,15 @@ export default function AdminPage() {
                   >
                     <Download className="w-5 h-5" />
                     Экспорт в Excel
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={results.length === 0 || allScores.length === 0}
+                    className="px-4 py-2 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold hover:opacity-90"
+                    style={{ backgroundColor: '#DC2626' }}
+                  >
+                    <Download className="w-5 h-5" />
+                    Судейские листы PDF
                   </button>
                 </div>
               </div>
