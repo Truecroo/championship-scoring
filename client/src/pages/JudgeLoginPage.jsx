@@ -51,7 +51,7 @@ export default function JudgeLoginPage() {
       }))
 
       // Перенаправляем на страницу судьи
-      navigate(`/judge/${judgeId}`)
+      navigate(`/judge/${data.judge.id}`)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -119,11 +119,6 @@ export default function JudgeLoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            По умолчанию пароль: <code className="bg-gray-100 px-2 py-1 rounded">judge123</code>
-          </p>
-        </div>
       </div>
     </div>
   )

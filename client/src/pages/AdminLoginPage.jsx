@@ -100,11 +100,6 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            По умолчанию пароль: <code className="bg-gray-100 px-2 py-1 rounded">admin123</code>
-          </p>
-        </div>
       </div>
     </div>
   )
