@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Eye, Heart, Send, CheckCircle, AlertCircle, Users } from 'lucide-react'
+import { Eye, Heart, Send, CheckCircle, AlertCircle, Users } from 'lucide-react'
 import { getCurrentTeam, createSpectatorScore, checkSpectatorVote } from '../utils/api'
 import FingerprintJS from '@fingerprintjs/fingerprintjs'
 
@@ -141,10 +140,6 @@ export default function SpectatorPage() {
       {/* Header */}
       <div className="shadow-lg" style={{ backgroundColor: '#141414' }}>
         <div className="max-w-2xl mx-auto px-4 py-6">
-          <Link to="/" className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-4">
-            <ArrowLeft className="w-4 h-4" />
-            Назад
-          </Link>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255, 191, 0, 0.2)' }}>
               <Eye className="w-10 h-10 text-white" />
