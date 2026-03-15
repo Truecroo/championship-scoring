@@ -71,6 +71,9 @@ export default function ModeratorPage() {
   }
 
   const handleSetCurrentTeam = async (teamId, nominationId) => {
+    const teamName = teams.find(t => t.id === teamId)?.name || 'команду'
+    if (!confirm(`Переключить голосование на «${teamName}»?`)) return
+
     try {
       await setCurrentTeamModerator(teamId, nominationId)
       const data = await getCurrentTeam()

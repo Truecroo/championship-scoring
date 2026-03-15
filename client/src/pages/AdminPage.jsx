@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [allScores, setAllScores] = useState([])
   const [judges, setJudges] = useState([])
   const [expandedTeam, setExpandedTeam] = useState(null)
+  const [collapsedNominations, setCollapsedNominations] = useState(new Set())
 
   const [newNominationName, setNewNominationName] = useState('')
   const [newTeamName, setNewTeamName] = useState('')
@@ -520,13 +521,16 @@ export default function AdminPage() {
             const scoreY = data.cell.y + 7
             doc.text(val.score != null ? Number(val.score).toFixed(1) : '—', x, scoreY, { align: 'center' })
 
+            doc.setFont('Roboto', 'normal')
+            doc.setFontSize(7)
+            doc.setTextColor(120, 120, 120)
             if (val.comment) {
-              doc.setFont('Roboto', 'normal')
-              doc.setFontSize(7)
-              doc.setTextColor(120, 120, 120)
               const maxWidth = data.cell.width - 4
               const lines = doc.splitTextToSize(val.comment, maxWidth)
               doc.text(lines, x, scoreY + 5, { align: 'center' })
+            } else {
+              doc.setTextColor(200, 200, 200)
+              doc.text('—', x, scoreY + 5, { align: 'center' })
             }
           },
         })
@@ -588,7 +592,10 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">Панель администратора</h1>
-              <p className="text-white/80">Управление чемпионатом</p>
+              <p className="text-white/80 flex items-center gap-2">
+                Управление чемпионатом
+                <span className={`inline-block w-2 h-2 rounded-full ${connectionError ? 'bg-red-500' : 'bg-green-400'}`} title={connectionError ? 'Нет связи с сервером' : 'Подключено'}></span>
+              </p>
             </div>
           </div>
         </div>
@@ -989,6 +996,24 @@ export default function AdminPage() {
                 <p className="text-center text-gray-500 py-8">Пока нет результатов</p>
               ) : (
                 <div className="space-y-6">
+                  {(() => {
+                    const nominationNames = Object.keys(results.reduce((acc, r) => { acc[r.nomination_name] = true; return acc }, {}))
+                    const allCollapsed = nominationNames.length > 0 && nominationNames.every(n => collapsedNominations.has(n))
+                    return nominationNames.length > 1 && (
+                      <button
+                        onClick={() => {
+                          if (allCollapsed) {
+                            setCollapsedNominations(new Set())
+                          } else {
+                            setCollapsedNominations(new Set(nominationNames))
+                          }
+                        }}
+                        className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        {allCollapsed ? 'Развернуть все' : 'Свернуть все'}
+                      </button>
+                    )
+                  })()}
                   {Object.entries(
                     results.reduce((acc, result) => {
                       if (!acc[result.nomination_name]) {
@@ -1005,11 +1030,22 @@ export default function AdminPage() {
 
                     return (
                       <div key={nominationName}>
-                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                        <h3
+                          className="text-xl font-bold mb-4 flex items-center gap-2 cursor-pointer select-none hover:opacity-70 transition-opacity"
+                          onClick={() => setCollapsedNominations(prev => {
+                            const next = new Set(prev)
+                            next.has(nominationName) ? next.delete(nominationName) : next.add(nominationName)
+                            return next
+                          })}
+                        >
+                          <ChevronRight className={`w-5 h-5 transition-transform ${collapsedNominations.has(nominationName) ? '' : 'rotate-90'}`} />
                           <Trophy className="w-6 h-6" style={{ color: '#FF6E00' }} />
                           {nominationName}
+                          <span className="text-sm font-normal text-gray-400 ml-2">{sortedByJudges.length} команд</span>
                         </h3>
 
+                        {!collapsedNominations.has(nominationName) && (
+                        <>
                         {/* Судейские результаты */}
                         <div className="mb-6">
                           <h4 className="text-sm font-semibold text-gray-700 mb-3">Оценки судей</h4>
@@ -1126,6 +1162,8 @@ export default function AdminPage() {
                             </table>
                           </div>
                         </div>
+                        </>
+                        )}
 
                       </div>
                     )
