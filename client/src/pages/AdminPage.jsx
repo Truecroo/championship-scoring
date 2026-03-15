@@ -102,20 +102,14 @@ export default function AdminPage() {
   }
 
   const loadResults = async () => {
-    try {
-      const [data, scoresData, judgesData] = await Promise.all([
-        getResults(),
-        getScores(),
-        getJudges()
-      ])
-      setResults(data)
-      setAllScores(scoresData)
-      setJudges(judgesData)
-    } catch (error) {
-      console.error('Error loading results:', error)
-      const data = await getResults().catch(() => [])
-      setResults(data)
-    }
+    const [data, scoresData, judgesData] = await Promise.allSettled([
+      getResults(),
+      getScores(),
+      getJudges()
+    ])
+    if (data.status === 'fulfilled') setResults(data.value)
+    if (scoresData.status === 'fulfilled') setAllScores(scoresData.value)
+    if (judgesData.status === 'fulfilled') setJudges(judgesData.value)
   }
 
   const handleCreateNomination = async (e) => {
@@ -332,6 +326,7 @@ export default function AdminPage() {
         const sorted = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
         sorted.forEach(r => {
           const teamScores = allScores.filter(s => s.team_id === r.team_id && s.nomination_id === r.nomination_id)
+            .sort((a, b) => String(a.judge_id).localeCompare(String(b.judge_id)))
           teamScores.forEach(score => {
             const judgeName = judges.find(j => String(j.id) === String(score.judge_id))?.name || `Судья ${score.judge_id}`
             detailData.push({
@@ -407,10 +402,12 @@ export default function AdminPage() {
         if (!isFirstPage) doc.addPage()
         isFirstPage = false
 
-        const teamJudges = teamScores.map(s => {
-          const judgeName = judges.find(j => String(j.id) === String(s.judge_id))?.name || `Судья ${s.judge_id}`
-          return { name: judgeName, scores: s.scores }
-        })
+        const teamJudges = teamScores
+          .sort((a, b) => String(a.judge_id).localeCompare(String(b.judge_id)))
+          .map(s => {
+            const judgeName = judges.find(j => String(j.id) === String(s.judge_id))?.name || `Судья ${s.judge_id}`
+            return { name: judgeName, scores: s.scores }
+          })
 
         const judgeCount = teamJudges.length
         const teamPenalty = result.penalty || 0
@@ -1082,7 +1079,7 @@ export default function AdminPage() {
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {teamScores.map(score => {
+                                                {[...teamScores].sort((a, b) => String(a.judge_id).localeCompare(String(b.judge_id))).map(score => {
                                                   const judgeName = judges.find(j => String(j.id) === String(score.judge_id))?.name || `Судья ${score.judge_id}`
                                                   return (
                                                     <tr key={score.judge_id} className="border-t border-gray-200">

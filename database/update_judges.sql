@@ -1,14 +1,9 @@
--- Обновление судей на новый состав
--- Алинучи, Эмиль, Алина Черновская
+-- Обновление имён судей в judge_auth
+-- Судья 1 -> Алинучи, Судья 2 -> Эмиль, Судья 3 -> Алина Черновская
 
--- Удаляем старых судей
-DELETE FROM judges;
-
--- Добавляем новых судей
-INSERT INTO judges (name, password) VALUES
-  ('Алинучи', '$2a$10$defaultpasswordhash1'),
-  ('Эмиль', '$2a$10$defaultpasswordhash2'),
-  ('Алина Черновская', '$2a$10$defaultpasswordhash3');
+UPDATE judge_auth SET name = 'Алинучи' WHERE id = '1';
+UPDATE judge_auth SET name = 'Эмиль' WHERE id = '2';
+UPDATE judge_auth SET name = 'Алина Черновская' WHERE id = '3';
 
 -- Проверка
-SELECT id, name FROM judges ORDER BY id;
+SELECT id, name FROM judge_auth ORDER BY id;

@@ -289,6 +289,7 @@ app.get('/api/nominations', async (req, res) => {
 app.post('/api/nominations', requireAdmin, async (req, res) => {
   try {
     const { name } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Название обязательно' })
 
     const { data, error } = await supabase
       .from('nominations')
@@ -348,6 +349,8 @@ app.get('/api/teams', async (req, res) => {
 app.post('/api/teams', requireAdmin, async (req, res) => {
   try {
     const { name, nomination_id, penalty } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Название команды обязательно' })
+    if (!nomination_id) return res.status(400).json({ error: 'Номинация обязательна' })
 
     const { data, error } = await supabase
       .from('teams')
@@ -357,6 +360,33 @@ app.post('/api/teams', requireAdmin, async (req, res) => {
 
     if (error) throw error
     res.json(data)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Reorder teams within a nomination (must be before :id route)
+app.put('/api/teams/reorder', requireAdmin, async (req, res) => {
+  try {
+    const { team_ids } = req.body // ordered array of team UUIDs
+
+    if (!Array.isArray(team_ids) || team_ids.length === 0) {
+      return res.status(400).json({ error: 'team_ids must be a non-empty array' })
+    }
+
+    // Update display_order for each team
+    const updates = team_ids.map((id, index) =>
+      supabase
+        .from('teams')
+        .update({ display_order: index })
+        .eq('id', id)
+    )
+
+    const results = await Promise.all(updates)
+    const failed = results.find(r => r.error)
+    if (failed) throw failed.error
+
+    res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -391,33 +421,6 @@ app.delete('/api/teams/:id', requireAdmin, async (req, res) => {
       .eq('id', id)
 
     if (error) throw error
-    res.json({ success: true })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-})
-
-// Reorder teams within a nomination
-app.put('/api/teams/reorder', requireAdmin, async (req, res) => {
-  try {
-    const { team_ids } = req.body // ordered array of team UUIDs
-
-    if (!Array.isArray(team_ids) || team_ids.length === 0) {
-      return res.status(400).json({ error: 'team_ids must be a non-empty array' })
-    }
-
-    // Update display_order for each team
-    const updates = team_ids.map((id, index) =>
-      supabase
-        .from('teams')
-        .update({ display_order: index })
-        .eq('id', id)
-    )
-
-    const results = await Promise.all(updates)
-    const failed = results.find(r => r.error)
-    if (failed) throw failed.error
-
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -742,6 +745,8 @@ app.get('/api/results', async (req, res) => {
           name
         )
       `)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
 
     if (teamsError) throw teamsError
 
