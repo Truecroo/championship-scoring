@@ -45,39 +45,31 @@ app.use(cors({
   credentials: true
 }))
 
-// Rate limiting to prevent abuse
-// 500 requests per 15 min — enough for 3 judges saving simultaneously
-// (each slider change = 1 debounced request, ~40-80 per judge per session)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // limit each IP to 500 requests per windowMs
-  message: 'Слишком много запросов с вашего IP, попробуйте позже'
-})
-
-// Stricter rate limit for authentication endpoints
+// Rate limiting — only for auth (brute-force protection) and spectator votes (spam protection)
+// Judge/admin endpoints have NO rate limit — they're behind auth tokens
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 login attempts per windowMs
-  message: 'Слишком много попыток входа, попробуйте позже'
+  windowMs: 15 * 60 * 1000,
+  max: 30, // 30 login attempts per 15 min per IP
+  message: 'Слишком много попыток входа, подождите немного'
 })
 
-// Rate limit for voting — high limit per IP because 600+ spectators may share WiFi at venue
-// Real duplicate protection is via fingerprint unique constraint in DB, not rate limiting
+// Vote spam protection — very high limit since 600+ spectators may share venue WiFi
+// Real duplicate protection is fingerprint unique constraint in DB
 const voteLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 300, // 300 votes per 5 min per IP (enough for 600 users on same WiFi, each votes once)
+  windowMs: 5 * 60 * 1000,
+  max: 3000, // 600 users on same WiFi, each votes a few times
   message: 'Слишком много голосов, подождите немного'
 })
 
-// High rate limit for read-only spectator endpoints (600+ concurrent users on same WiFi polling)
-// Each spectator polls ~6 req/min, on shared WiFi 600 users = 3600 req/min from 1 IP
+// Spectator read endpoints — essentially unlimited (polling from 600+ devices on same WiFi)
 const spectatorReadLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 4000, // 600 users × 6 req/min + safety margin
+  windowMs: 1 * 60 * 1000,
+  max: 10000, // 600 users × ~10 req/min + big safety margin
   message: 'Слишком много запросов, подождите немного'
 })
 
-app.use('/api/', limiter)
+// NO general rate limiter — judge/admin endpoints are protected by auth tokens
+// Only auth, vote, and spectator-read endpoints have rate limits (applied per-route below)
 app.use(express.json())
 
 // UUID v4 validation
