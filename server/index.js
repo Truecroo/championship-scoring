@@ -721,7 +721,12 @@ app.post('/api/current-team', requireModeratorOrAdmin, async (req, res) => {
     const { team_id, nomination_id, voting_mode } = req.body
 
     const updateData = { team_id, nomination_id }
-    if (voting_mode) updateData.voting_mode = voting_mode
+    if (voting_mode) {
+      if (!['live', 'top3', 'closed'].includes(voting_mode)) {
+        return res.status(400).json({ error: 'Недопустимый режим голосования' })
+      }
+      updateData.voting_mode = voting_mode
+    }
 
     const { error } = await supabase
       .from('current_team')
@@ -743,6 +748,10 @@ app.post('/api/top3-votes', voteLimiter, async (req, res) => {
 
     if (!fingerprint || !first_team_id || !second_team_id || !third_team_id) {
       return res.status(400).json({ error: 'Все поля обязательны' })
+    }
+
+    if (!isValidUUID(first_team_id) || !isValidUUID(second_team_id) || !isValidUUID(third_team_id)) {
+      return res.status(400).json({ error: 'Некорректный ID команды' })
     }
 
     if (first_team_id === second_team_id || first_team_id === third_team_id || second_team_id === third_team_id) {
