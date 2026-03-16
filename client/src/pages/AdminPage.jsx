@@ -291,6 +291,13 @@ export default function AdminPage() {
       return
     }
 
+    const criteria = [
+      { key: 'choreography', label: 'ХОРЕОГРАФИЯ И РИСУНКИ' },
+      { key: 'technique', label: 'ТЕХНИКА И ИСПОЛНЕНИЕ' },
+      { key: 'artistry', label: 'АРТИСТИЗМ, ОБРАЗ И КОСТЮМ' },
+      { key: 'overall', label: 'ОБЩЕЕ ВПЕЧАТЛЕНИЕ' }
+    ]
+
     // Группируем по номинациям
     const resultsByNomination = results.reduce((acc, result) => {
       if (!acc[result.nomination_name]) {
@@ -300,62 +307,83 @@ export default function AdminPage() {
       return acc
     }, {})
 
-    // Создаем workbook
     const wb = XLSX.utils.book_new()
 
-    // Для каждой номинации создаем отдельный лист
+    // Для каждой номинации — отдельный лист в формате шаблона
     Object.entries(resultsByNomination).forEach(([nominationName, nominationResults]) => {
       const sortedResults = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
 
-      const data = sortedResults.map((r, index) => ({
-        'Место': index + 1,
-        'Команда': r.team_name,
-        'Балл судей': r.judges_score.toFixed(2),
-        'Штраф': r.penalty || 0,
-        'Кол-во судей': r.judges_count,
-        'Балл зрителей': r.spectators_avg.toFixed(2),
-        'Голосов зрителей': r.spectator_votes,
-        'Очки Топ-3': r.top3_points || 0
-      }))
+      // Собираем уникальных судей, оценивших эту номинацию
+      const nominationScores = allScores.filter(s => s.nomination_id === sortedResults[0]?.nomination_id)
+      const judgeIds = [...new Set(nominationScores.map(s => String(s.judge_id)))]
+      const judgeList = judgeIds.map(id => {
+        const j = judges.find(j => String(j.id) === id)
+        return { id, name: j?.name || `Судья ${id}` }
+      })
 
-      const ws = XLSX.utils.json_to_sheet(data)
-      XLSX.utils.book_append_sheet(wb, ws, nominationName.substring(0, 31)) // Excel limit 31 chars
-    })
+      // Строка 1: пустые + имена судей (мерж по 4 столбца) + ИТОГО
+      // Строка 2: №, КОМАНДА, [критерии x N судей], СРЕДНИЙ БАЛЛ, ШТРАФ, ИТОГО
+      const colsPerJudge = criteria.length
+      const headerRow1 = ['', '']
+      const headerRow2 = ['№', 'КОМАНДА']
 
-    // Детальный лист с оценками по судьям
-    if (allScores.length > 0) {
-      const detailData = []
-      Object.entries(resultsByNomination).forEach(([nominationName, nominationResults]) => {
-        const sorted = [...nominationResults].sort((a, b) => b.judges_score - a.judges_score)
-        sorted.forEach(r => {
-          const teamScores = allScores.filter(s => s.team_id === r.team_id && s.nomination_id === r.nomination_id)
-            .sort((a, b) => String(a.judge_id).localeCompare(String(b.judge_id)))
-          teamScores.forEach(score => {
-            const judgeName = judges.find(j => String(j.id) === String(score.judge_id))?.name || `Судья ${score.judge_id}`
-            detailData.push({
-              'Номинация': nominationName,
-              'Команда': r.team_name,
-              'Судья': judgeName,
-              'Хореография': score.scores.choreography.score ?? '',
-              'Комм. хорео': score.scores.choreography.comment || '',
-              'Техника': score.scores.technique.score ?? '',
-              'Комм. техника': score.scores.technique.comment || '',
-              'Артистизм': score.scores.artistry.score ?? '',
-              'Комм. артистизм': score.scores.artistry.comment || '',
-              'Общее': score.scores.overall.score ?? '',
-              'Комм. общее': score.scores.overall.comment || '',
-              'Средневзвеш.': score.average?.toFixed(2) ?? ''
-            })
+      judgeList.forEach(judge => {
+        headerRow1.push(judge.name)
+        for (let i = 1; i < colsPerJudge; i++) headerRow1.push('')
+        criteria.forEach(c => headerRow2.push(c.label))
+      })
+      headerRow1.push('', '', '')
+      headerRow2.push('СРЕДНИЙ БАЛЛ', 'ШТРАФ', 'ИТОГО')
+
+      const rows = [headerRow1, headerRow2]
+
+      // Данные команд
+      sortedResults.forEach((r, idx) => {
+        const row = [idx + 1, r.team_name]
+        judgeList.forEach(judge => {
+          const score = nominationScores.find(
+            s => String(s.judge_id) === judge.id && s.team_id === r.team_id
+          )
+          criteria.forEach(c => {
+            row.push(score?.scores?.[c.key]?.score ?? '')
           })
         })
+        row.push(
+          r.judges_score ? Number(r.judges_score.toFixed(2)) : '',
+          r.penalty || 0,
+          r.judges_score ? Number((r.judges_score - (r.penalty || 0)).toFixed(2)) : ''
+        )
+        rows.push(row)
       })
-      if (detailData.length > 0) {
-        const ws = XLSX.utils.json_to_sheet(detailData)
-        XLSX.utils.book_append_sheet(wb, ws, 'Подробные оценки')
-      }
-    }
 
-    // Сохраняем файл
+      const ws = XLSX.utils.aoa_to_sheet(rows)
+
+      // Мерж ячеек для имён судей (строка 0)
+      const merges = []
+      let col = 2 // начинаем после № и КОМАНДА
+      judgeList.forEach(() => {
+        merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + colsPerJudge - 1 } })
+        col += colsPerJudge
+      })
+      // Мерж для СРЕДНИЙ БАЛЛ, ШТРАФ, ИТОГО (строки 0-1 вертикально)
+      const summaryStart = 2 + judgeList.length * colsPerJudge
+      for (let i = 0; i < 3; i++) {
+        merges.push({ s: { r: 0, c: summaryStart + i }, e: { r: 1, c: summaryStart + i } })
+      }
+      // Мерж № и КОМАНДА (строки 0-1 вертикально)
+      merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } })
+      merges.push({ s: { r: 0, c: 1 }, e: { r: 1, c: 1 } })
+      ws['!merges'] = merges
+
+      // Ширина колонок
+      const colWidths = [{ wch: 4 }, { wch: 25 }]
+      for (let i = 0; i < judgeList.length * colsPerJudge; i++) colWidths.push({ wch: 14 })
+      colWidths.push({ wch: 14 }, { wch: 10 }, { wch: 10 })
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, nominationName.substring(0, 31))
+    })
+
     const timestamp = new Date().toISOString().split('T')[0]
     XLSX.writeFile(wb, `Результаты_чемпионата_${timestamp}.xlsx`)
   }
