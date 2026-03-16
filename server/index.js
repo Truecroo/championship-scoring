@@ -8,8 +8,21 @@ import { createClient } from '@supabase/supabase-js'
 
 const app = express()
 
+// Prevent server crash on unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err)
+})
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION:', err)
+})
+
 // Security headers
 app.use(helmet())
+
+// Health check — no auth, no rate limit
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() })
+})
 const PORT = process.env.PORT || 5001
 
 // Initialize Supabase client with SERVICE ROLE KEY for RLS bypass
