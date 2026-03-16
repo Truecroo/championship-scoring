@@ -16,6 +16,9 @@ process.on('unhandledRejection', (err) => {
   console.error('UNHANDLED REJECTION:', err)
 })
 
+// Render runs behind a proxy — required for express-rate-limit to work
+app.set('trust proxy', 1)
+
 // Security headers
 app.use(helmet())
 
