@@ -674,14 +674,16 @@ app.get('/api/current-team', spectatorReadLimiter, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('current_team')
-      .select('team_id, nomination_id')
+      .select('team_id, nomination_id, voting_mode')
       .eq('id', 1)
       .single()
 
     if (error) throw error
 
+    const votingMode = data.voting_mode || 'live'
+
     if (!data.team_id || !data.nomination_id) {
-      res.json(null)
+      res.json({ voting_mode: votingMode })
       return
     }
 
@@ -706,7 +708,8 @@ app.get('/api/current-team', spectatorReadLimiter, async (req, res) => {
       team_id: data.team_id,
       nomination_id: data.nomination_id,
       team_name: team.name,
-      nomination_name: nomination.name
+      nomination_name: nomination.name,
+      voting_mode: votingMode
     })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -715,15 +718,92 @@ app.get('/api/current-team', spectatorReadLimiter, async (req, res) => {
 
 app.post('/api/current-team', requireModeratorOrAdmin, async (req, res) => {
   try {
-    const { team_id, nomination_id } = req.body
+    const { team_id, nomination_id, voting_mode } = req.body
+
+    const updateData = { team_id, nomination_id }
+    if (voting_mode) updateData.voting_mode = voting_mode
 
     const { error } = await supabase
       .from('current_team')
-      .update({ team_id, nomination_id })
+      .update(updateData)
       .eq('id', 1)
 
     if (error) throw error
     res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// ============ TOP-3 VOTES ============
+
+app.post('/api/top3-votes', voteLimiter, async (req, res) => {
+  try {
+    const { fingerprint, first_team_id, second_team_id, third_team_id } = req.body
+
+    if (!fingerprint || !first_team_id || !second_team_id || !third_team_id) {
+      return res.status(400).json({ error: 'Все поля обязательны' })
+    }
+
+    if (first_team_id === second_team_id || first_team_id === third_team_id || second_team_id === third_team_id) {
+      return res.status(400).json({ error: 'Все три команды должны быть разными' })
+    }
+
+    // Verify voting mode is top3
+    const { data: config } = await supabase
+      .from('current_team')
+      .select('voting_mode')
+      .eq('id', 1)
+      .single()
+
+    if (config?.voting_mode !== 'top3') {
+      return res.status(400).json({ error: 'Голосование Top-3 сейчас не активно' })
+    }
+
+    const { data, error } = await supabase
+      .from('top3_votes')
+      .insert([{ fingerprint, first_team_id, second_team_id, third_team_id }])
+      .select()
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(400).json({ error: 'Вы уже проголосовали' })
+      }
+      throw error
+    }
+
+    res.json({ id: data.id, success: true })
+  } catch (error) {
+    console.error('Top-3 vote error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.get('/api/top3-votes/check', spectatorReadLimiter, async (req, res) => {
+  try {
+    const { fingerprint } = req.query
+
+    // Total ballot count
+    const { count, error: countError } = await supabase
+      .from('top3_votes')
+      .select('*', { count: 'exact', head: true })
+
+    if (countError) throw countError
+
+    let hasVoted = false
+    if (fingerprint) {
+      const { data, error: checkError } = await supabase
+        .from('top3_votes')
+        .select('id')
+        .eq('fingerprint', fingerprint)
+        .limit(1)
+
+      if (checkError) throw checkError
+      hasVoted = data.length > 0
+    }
+
+    res.json({ total_votes: count, has_voted: hasVoted })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -763,6 +843,22 @@ app.get('/api/results', async (req, res) => {
       .select('team_id, nomination_id, score')
 
     if (spectatorError) throw spectatorError
+
+    // Fetch top-3 votes
+    const { data: top3Votes, error: top3Error } = await supabase
+      .from('top3_votes')
+      .select('first_team_id, second_team_id, third_team_id')
+
+    // top3 table may not exist yet — ignore error
+    const top3Data = top3Error ? [] : (top3Votes || [])
+
+    // Aggregate top-3 points per team: 1st=3, 2nd=2, 3rd=1
+    const top3Map = new Map()
+    for (const v of top3Data) {
+      top3Map.set(v.first_team_id, (top3Map.get(v.first_team_id) || 0) + 3)
+      top3Map.set(v.second_team_id, (top3Map.get(v.second_team_id) || 0) + 2)
+      top3Map.set(v.third_team_id, (top3Map.get(v.third_team_id) || 0) + 1)
+    }
 
     // Pre-group scores by team_id+nomination_id for O(1) lookups instead of O(n) per team
     const judgeMap = new Map()
@@ -805,7 +901,8 @@ app.get('/api/results', async (req, res) => {
         judges_count: judgeAvgs.length,
         penalty,
         spectators_avg: Math.round(spectatorsAvg * 100) / 100,
-        spectator_votes: specScores.length
+        spectator_votes: specScores.length,
+        top3_points: top3Map.get(team.id) || 0
       }
     })
 

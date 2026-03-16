@@ -93,6 +93,7 @@ export default function AdminPage() {
       setNominations(nomsData)
       setTeams(teamsData)
       setCurrentTeamState(currentData)
+      setVotingMode(currentData?.voting_mode || 'live')
       setConnectionError(false)
     } catch (error) {
       console.error('Error loading data:', error)
@@ -220,7 +221,7 @@ export default function AdminPage() {
     if (!tId || !nId) return
 
     try {
-      await setCurrentTeam(tId, nId)
+      await setCurrentTeam(tId, nId, votingMode)
       await loadData()
       showToast('Текущая команда переключена')
     } catch (error) {
@@ -313,7 +314,8 @@ export default function AdminPage() {
         'Штраф': r.penalty || 0,
         'Кол-во судей': r.judges_count,
         'Балл зрителей': r.spectators_avg.toFixed(2),
-        'Голосов зрителей': r.spectator_votes
+        'Голосов зрителей': r.spectator_votes,
+        'Очки Топ-3': r.top3_points || 0
       }))
 
       const ws = XLSX.utils.json_to_sheet(data)
@@ -555,6 +557,7 @@ export default function AdminPage() {
     }
   }
 
+  const [votingMode, setVotingMode] = useState('live')
   const [showQR, setShowQR] = useState(false)
   // Формируем правильный URL для голосования
   const basePath = import.meta.env.BASE_URL || '/'
@@ -846,61 +849,117 @@ export default function AdminPage() {
           {/* Current Team Tab */}
           {activeTab === 'current' && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">Текущая команда для зрителей</h2>
+              <h2 className="text-2xl font-bold mb-6">Голосование зрителей</h2>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-blue-800">
-                  Выберите команду, за которую сейчас могут голосовать зрители. Зрители голосуют по ссылке: <code className="bg-blue-100 px-2 py-1 rounded">/vote</code>
-                </p>
+              {/* Voting mode switcher */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Режим голосования:</p>
+                <div className="flex gap-2">
+                  {[
+                    { mode: 'live', label: 'Live-оценки', desc: 'Оценка по ходу выступлений' },
+                    { mode: 'top3', label: 'Топ-3 финал', desc: 'Выбор 3 лучших команд' },
+                    { mode: 'closed', label: 'Закрыто', desc: 'Голосование отключено' },
+                  ].map(({ mode, label, desc }) => (
+                    <button
+                      key={mode}
+                      onClick={async () => {
+                        if (mode === votingMode) return
+                        if (!confirm(`Переключить режим голосования на "${label}"?`)) return
+                        try {
+                          await setCurrentTeam(currentTeam?.team_id || null, currentTeam?.nomination_id || null, mode)
+                          setVotingMode(mode)
+                          showToast(`Режим: ${label}`)
+                        } catch (err) {
+                          showToast('Ошибка переключения режима', 'error')
+                        }
+                      }}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 text-center transition-all ${
+                        votingMode === mode
+                          ? 'font-bold'
+                          : 'bg-white border-gray-200 hover:border-gray-400'
+                      }`}
+                      style={votingMode === mode ? { backgroundColor: '#FFF3E6', borderColor: '#FF6E00', color: '#FF6E00' } : {}}
+                    >
+                      <div className="font-semibold">{label}</div>
+                      <div className="text-xs text-gray-500 mt-1">{desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {currentTeam && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-green-800 mb-1">Сейчас голосуют за:</p>
-                  <p className="font-bold text-lg text-green-900">{currentTeam.team_name}</p>
-                  <p className="text-sm text-green-700">{currentTeam.nomination_name}</p>
+              {votingMode === 'live' && (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <p className="text-sm text-blue-800">
+                      Выберите команду, за которую сейчас могут голосовать зрители. Зрители голосуют по ссылке: <code className="bg-blue-100 px-2 py-1 rounded">/vote</code>
+                    </p>
+                  </div>
+
+                  {currentTeam?.team_name && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                      <p className="text-sm text-green-800 mb-1">Сейчас голосуют за:</p>
+                      <p className="font-bold text-lg text-green-900">{currentTeam.team_name}</p>
+                      <p className="text-sm text-green-700">{currentTeam.nomination_name}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    {nominations.map((nomination) => {
+                      const nominationTeams = teams.filter(t => t.nomination_id === nomination.id)
+                      if (nominationTeams.length === 0) return null
+
+                      return (
+                        <div key={nomination.id} className="border border-gray-200 rounded-lg p-4">
+                          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <Trophy className="w-5 h-5" style={{ color: '#FF6E00' }} />
+                            {nomination.name}
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                            {nominationTeams.map((team) => (
+                              <button
+                                key={team.id}
+                                onClick={() => handleSetCurrentTeam(team.id, nomination.id)}
+                                className={`px-4 py-3 text-left rounded-lg border-2 transition-all ${
+                                  currentTeam?.team_id === team.id
+                                    ? 'border-green-500 text-green-900 font-semibold'
+                                    : 'bg-white border-gray-200 hover:border-orange-400 hover:bg-orange-50'
+                                }`}
+                                style={currentTeam?.team_id === team.id ? { backgroundColor: '#FFF3E6', borderColor: '#FF6E00' } : {}}
+                              >
+                                {team.name}
+                                {currentTeam?.team_id === team.id && (
+                                  <span className="ml-2" style={{ color: '#FF6E00' }}>●</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {nominations.length === 0 && (
+                      <p className="text-center text-gray-500 py-8">Сначала добавьте номинации и команды</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {votingMode === 'top3' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <p className="text-amber-800 font-semibold mb-1">Режим «Топ-3» активен</p>
+                  <p className="text-sm text-amber-700">
+                    Зрители видят все команды и выбирают 3 лучшие (1-е место = 3 очка, 2-е = 2, 3-е = 1).
+                    Ссылка для голосования: <code className="bg-amber-100 px-2 py-1 rounded">/vote</code>
+                  </p>
                 </div>
               )}
 
-              {/* Быстрое переключение по номинациям */}
-              <div className="space-y-4">
-                {nominations.map((nomination) => {
-                  const nominationTeams = teams.filter(t => t.nomination_id === nomination.id)
-                  if (nominationTeams.length === 0) return null
-
-                  return (
-                    <div key={nomination.id} className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                        <Trophy className="w-5 h-5" style={{ color: '#FF6E00' }} />
-                        {nomination.name}
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                        {nominationTeams.map((team) => (
-                          <button
-                            key={team.id}
-                            onClick={() => handleSetCurrentTeam(team.id, nomination.id)}
-                            className={`px-4 py-3 text-left rounded-lg border-2 transition-all ${
-                              currentTeam?.team_id === team.id
-                                ? 'border-green-500 text-green-900 font-semibold'
-                                : 'bg-white border-gray-200 hover:border-orange-400 hover:bg-orange-50'
-                            }`}
-                            style={currentTeam?.team_id === team.id ? { backgroundColor: '#FFF3E6', borderColor: '#FF6E00' } : {}}
-                          >
-                            {team.name}
-                            {currentTeam?.team_id === team.id && (
-                              <span className="ml-2" style={{ color: '#FF6E00' }}>●</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {nominations.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">Сначала добавьте номинации и команды</p>
-                )}
-              </div>
+              {votingMode === 'closed' && (
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
+                  <p className="text-gray-700 font-semibold">Голосование закрыто</p>
+                  <p className="text-sm text-gray-500">Зрители видят сообщение «Голосование закрыто».</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -1169,7 +1228,7 @@ export default function AdminPage() {
                     )
                   })}
 
-                  {/* Зрительские голоса - общая таблица */}
+                  {/* Зрительские голоса (live) - общая таблица */}
                   {(() => {
                     const allSpectatorResults = results
                       .filter(r => r.spectator_votes > 0)
@@ -1180,7 +1239,7 @@ export default function AdminPage() {
 
                     return (
                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <h4 className="text-lg font-bold text-amber-800 mb-3">ТОП-5 по выбору зрителей</h4>
+                        <h4 className="text-lg font-bold text-amber-800 mb-3">ТОП-5 по live-оценкам зрителей</h4>
                         <div className="space-y-2">
                           {allSpectatorResults.map((result, index) => (
                             <div key={result.team_id} className={`flex items-center justify-between p-3 rounded-lg ${
@@ -1205,6 +1264,48 @@ export default function AdminPage() {
                                 </div>
                               </div>
                               {index === 0 && <Trophy className="w-8 h-8 text-amber-600" />}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Топ-3 зрительские симпатии */}
+                  {(() => {
+                    const top3Results = results
+                      .filter(r => r.top3_points > 0)
+                      .sort((a, b) => b.top3_points - a.top3_points)
+
+                    if (top3Results.length === 0) return null
+
+                    const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32']
+
+                    return (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <h4 className="text-lg font-bold text-purple-800 mb-3">Приз зрительских симпатий (Топ-3)</h4>
+                        <div className="space-y-2">
+                          {top3Results.map((result, index) => (
+                            <div key={result.team_id} className={`flex items-center justify-between p-3 rounded-lg ${
+                              index === 0 ? 'bg-purple-100 border border-purple-300' : 'bg-white border border-purple-200'
+                            }`}>
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-white"
+                                  style={{ backgroundColor: index < 3 ? medalColors[index] : '#9CA3AF', color: index < 3 ? '#000' : '#fff' }}
+                                >
+                                  {index + 1}
+                                </span>
+                                <div>
+                                  <p className={`font-bold ${index === 0 ? 'text-purple-900' : 'text-gray-900'}`}>
+                                    {result.team_name}
+                                  </p>
+                                  <p className="text-sm text-purple-700">
+                                    {result.nomination_name} — <span className="font-semibold">{result.top3_points} очков</span>
+                                  </p>
+                                </div>
+                              </div>
+                              {index === 0 && <Trophy className="w-8 h-8 text-purple-600" />}
                             </div>
                           ))}
                         </div>
