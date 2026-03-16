@@ -207,10 +207,10 @@ export const getCurrentTeam = api(
 
 export const setCurrentTeam = api(
   mockApi.setCurrentTeam,
-  async (teamId, nominationId) => safeFetch(`${API_URL}/current-team`, {
+  async (teamId, nominationId, votingMode) => safeFetch(`${API_URL}/current-team`, {
     method: 'POST',
     headers: adminHeaders(),
-    body: JSON.stringify({ team_id: teamId, nomination_id: nominationId })
+    body: JSON.stringify({ team_id: teamId, nomination_id: nominationId, voting_mode: votingMode })
   })
 )
 
@@ -223,11 +223,30 @@ export const getJudges = api(
 // Moderator: switch current team
 export const setCurrentTeamModerator = api(
   mockApi.setCurrentTeam,
-  async (teamId, nominationId) => safeFetch(`${API_URL}/current-team`, {
+  async (teamId, nominationId, votingMode) => safeFetch(`${API_URL}/current-team`, {
     method: 'POST',
     headers: moderatorHeaders(),
-    body: JSON.stringify({ team_id: teamId, nomination_id: nominationId })
+    body: JSON.stringify({ team_id: teamId, nomination_id: nominationId, voting_mode: votingMode })
   })
+)
+
+// Top-3 Votes
+export const submitTop3Vote = api(
+  () => Promise.resolve({ success: true }),
+  async (fingerprint, firstTeamId, secondTeamId, thirdTeamId) => safeFetch(`${API_URL}/top3-votes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fingerprint, first_team_id: firstTeamId, second_team_id: secondTeamId, third_team_id: thirdTeamId })
+  })
+)
+
+export const checkTop3Vote = api(
+  () => Promise.resolve({ total_votes: 0, has_voted: false }),
+  async (fingerprint) => {
+    const params = new URLSearchParams()
+    if (fingerprint) params.append('fingerprint', fingerprint)
+    return safeFetch(`${API_URL}/top3-votes/check?${params}`)
+  }
 )
 
 // Results
