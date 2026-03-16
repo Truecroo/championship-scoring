@@ -22,14 +22,14 @@ function LiveVoteUI({ currentTeam, fingerprint, fingerprintError }) {
   }
 
   useEffect(() => {
-    if (currentTeam && fingerprint) {
+    if (currentTeam?.team_id && fingerprint) {
       loadVoteStatus()
     }
-    if (currentTeam) {
+    if (currentTeam?.team_id) {
       const voteInterval = setInterval(loadVoteStatus, 30000)
       return () => clearInterval(voteInterval)
     }
-  }, [currentTeam, fingerprint])
+  }, [currentTeam?.team_id, fingerprint])
 
   // Reset when team changes
   useEffect(() => {
@@ -39,7 +39,7 @@ function LiveVoteUI({ currentTeam, fingerprint, fingerprintError }) {
   }, [currentTeam?.team_id])
 
   const loadVoteStatus = async () => {
-    if (!currentTeam) return
+    if (!currentTeam?.team_id) return
     try {
       const result = await checkSpectatorVote(currentTeam.team_id, currentTeam.nomination_id, fingerprint)
       setVoteCount(result.vote_count)
@@ -344,6 +344,12 @@ function Top3VoteUI({ fingerprint, fingerprintError }) {
               <CheckCircle className="w-12 h-12 mx-auto mb-3" style={{ color: '#FFBF00' }} />
               <p className="text-lg font-semibold text-white">Вы уже проголосовали!</p>
               <p className="text-sm text-gray-300 mt-1">Спасибо за участие</p>
+            </div>
+          ) : allTeams.length < 3 ? (
+            <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(255, 191, 0, 0.1)', border: '2px solid rgba(255, 191, 0, 0.3)' }}>
+              <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+              <p className="text-lg font-semibold text-white">Недостаточно команд для голосования</p>
+              <p className="text-sm text-gray-300 mt-1">Нужно минимум 3 команды</p>
             </div>
           ) : (
             <>
