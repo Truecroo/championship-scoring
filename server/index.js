@@ -8,6 +8,30 @@ import { createClient } from '@supabase/supabase-js'
 
 const app = express()
 
+// Simple in-memory cache: { key: { data, expires } }
+const cache = new Map()
+function invalidateTeamsCache() {
+  for (const key of cache.keys()) {
+    if (key.startsWith('teams:')) cache.delete(key)
+  }
+}
+function cached(key, ttlMs, fetchFn) {
+  return async (req, res) => {
+    const cacheKey = typeof key === 'function' ? key(req) : key
+    const entry = cache.get(cacheKey)
+    if (entry && Date.now() < entry.expires) {
+      return res.json(entry.data)
+    }
+    try {
+      const data = await fetchFn(req)
+      cache.set(cacheKey, { data, expires: Date.now() + ttlMs })
+      res.json(data)
+    } catch (error) {
+      res.status(500).json({ error: error.message })
+    }
+  }
+}
+
 // Prevent server crash on unhandled errors
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err)
@@ -280,19 +304,14 @@ app.get('/api/judges', requireAdmin, async (req, res) => {
 
 // ============ NOMINATIONS ============
 
-app.get('/api/nominations', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('nominations')
-      .select('*')
-      .order('created_at', { ascending: true })
-
-    if (error) throw error
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-})
+app.get('/api/nominations', cached('nominations', 5000, async () => {
+  const { data, error } = await supabase
+    .from('nominations')
+    .select('*')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data
+}))
 
 app.post('/api/nominations', requireAdmin, async (req, res) => {
   try {
@@ -306,6 +325,7 @@ app.post('/api/nominations', requireAdmin, async (req, res) => {
       .single()
 
     if (error) throw error
+    cache.delete('nominations')
     res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -323,6 +343,7 @@ app.delete('/api/nominations/:id', requireAdmin, async (req, res) => {
       .eq('id', id)
 
     if (error) throw error
+    cache.delete('nominations')
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -331,28 +352,24 @@ app.delete('/api/nominations/:id', requireAdmin, async (req, res) => {
 
 // ============ TEAMS ============
 
-app.get('/api/teams', async (req, res) => {
-  try {
+app.get('/api/teams', cached(
+  (req) => `teams:${req.query.nomination_id || 'all'}`,
+  5000,
+  async (req) => {
     const { nomination_id } = req.query
-
     let query = supabase
       .from('teams')
       .select('*')
       .order('display_order', { ascending: true })
       .order('created_at', { ascending: true })
-
     if (nomination_id) {
       query = query.eq('nomination_id', nomination_id)
     }
-
     const { data, error } = await query
-
     if (error) throw error
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
+    return data
   }
-})
+))
 
 app.post('/api/teams', requireAdmin, async (req, res) => {
   try {
@@ -367,6 +384,7 @@ app.post('/api/teams', requireAdmin, async (req, res) => {
       .single()
 
     if (error) throw error
+    invalidateTeamsCache()
     res.json(data)
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -394,6 +412,7 @@ app.put('/api/teams/reorder', requireAdmin, async (req, res) => {
     const failed = results.find(r => r.error)
     if (failed) throw failed.error
 
+    invalidateTeamsCache()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -412,6 +431,7 @@ app.put('/api/teams/:id', requireAdmin, async (req, res) => {
       .eq('id', id)
 
     if (error) throw error
+    invalidateTeamsCache()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -429,6 +449,7 @@ app.delete('/api/teams/:id', requireAdmin, async (req, res) => {
       .eq('id', id)
 
     if (error) throw error
+    invalidateTeamsCache()
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -684,51 +705,37 @@ app.post('/api/spectator-scores', voteLimiter, async (req, res) => {
 
 // ============ CURRENT TEAM ============
 
-app.get('/api/current-team', spectatorReadLimiter, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('current_team')
-      .select('team_id, nomination_id, voting_mode')
-      .eq('id', 1)
-      .single()
+app.get('/api/current-team', spectatorReadLimiter, cached('current-team', 3000, async () => {
+  const { data, error } = await supabase
+    .from('current_team')
+    .select('team_id, nomination_id, voting_mode')
+    .eq('id', 1)
+    .single()
 
-    if (error) throw error
+  if (error) throw error
 
-    const votingMode = data.voting_mode || 'live'
+  const votingMode = data.voting_mode || 'live'
 
-    if (!data.team_id || !data.nomination_id) {
-      res.json({ voting_mode: votingMode })
-      return
-    }
-
-    // Fetch team and nomination names
-    const { data: team, error: teamError } = await supabase
-      .from('teams')
-      .select('name')
-      .eq('id', data.team_id)
-      .single()
-
-    if (teamError) throw teamError
-
-    const { data: nomination, error: nominationError } = await supabase
-      .from('nominations')
-      .select('name')
-      .eq('id', data.nomination_id)
-      .single()
-
-    if (nominationError) throw nominationError
-
-    res.json({
-      team_id: data.team_id,
-      nomination_id: data.nomination_id,
-      team_name: team.name,
-      nomination_name: nomination.name,
-      voting_mode: votingMode
-    })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
+  if (!data.team_id || !data.nomination_id) {
+    return { voting_mode: votingMode }
   }
-})
+
+  const [{ data: team, error: teamError }, { data: nomination, error: nominationError }] = await Promise.all([
+    supabase.from('teams').select('name').eq('id', data.team_id).single(),
+    supabase.from('nominations').select('name').eq('id', data.nomination_id).single()
+  ])
+
+  if (teamError) throw teamError
+  if (nominationError) throw nominationError
+
+  return {
+    team_id: data.team_id,
+    nomination_id: data.nomination_id,
+    team_name: team.name,
+    nomination_name: nomination.name,
+    voting_mode: votingMode
+  }
+}))
 
 app.post('/api/current-team', requireModeratorOrAdmin, async (req, res) => {
   try {
@@ -748,6 +755,7 @@ app.post('/api/current-team', requireModeratorOrAdmin, async (req, res) => {
       .eq('id', 1)
 
     if (error) throw error
+    cache.delete('current-team') // invalidate cache on update
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
