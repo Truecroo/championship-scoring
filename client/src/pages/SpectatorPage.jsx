@@ -155,7 +155,7 @@ function LiveVoteUI({ currentTeam, fingerprint, fingerprintError }) {
                     <input
                       type="range" min="0.1" max="10.0" step="0.1" value={score}
                       onChange={(e) => setScore(parseFloat(e.target.value))}
-                      className="w-full h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-gold-thumb"
                       style={{ background: `linear-gradient(to right, #FFBF00 0%, #FFBF00 ${((score - 0.1) / 9.9) * 100}%, #4a4a4a ${((score - 0.1) / 9.9) * 100}%, #4a4a4a 100%)` }}
                     />
                     <div className="flex justify-between text-sm text-gray-400 mt-2">
@@ -364,7 +364,7 @@ function Top3VoteUI({ fingerprint, fingerprintError }) {
                     <span className="text-xs font-bold mb-1" style={{ color: RANK_STYLES[idx].color }}>
                       {RANK_STYLES[idx].label}
                     </span>
-                    <span className="text-xs opacity-60 text-white">{RANK_STYLES[idx].points} очка</span>
+                    <span className="text-xs opacity-60 text-white">{RANK_STYLES[idx].points} {RANK_STYLES[idx].points === 1 ? 'очко' : 'очка'}</span>
                     {teamId ? (
                       <>
                         <p className="text-sm font-semibold text-white mt-1 leading-tight">{getTeamName(teamId)}</p>
