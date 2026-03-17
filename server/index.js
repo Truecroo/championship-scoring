@@ -485,6 +485,12 @@ app.post('/api/scores', async (req, res) => {
   try {
     const { judge_id, nomination_id, team_id, scores } = req.body
 
+    // Verify judge exists
+    if (!judge_id) return res.status(400).json({ error: 'judge_id обязателен' })
+    const { data: judge, error: judgeError } = await supabase
+      .from('judge_auth').select('id').eq('id', judge_id).single()
+    if (judgeError || !judge) return res.status(403).json({ error: 'Судья не найден' })
+
     // Calculate weighted average only from filled criteria (proportional)
     let totalWeighted = 0
     let totalWeight = 0
@@ -569,7 +575,7 @@ app.put('/api/scores/:id', async (req, res) => {
   }
 })
 
-app.delete('/api/scores/:id', async (req, res) => {
+app.delete('/api/scores/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
     if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })

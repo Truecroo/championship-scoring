@@ -15,6 +15,13 @@ body {
   box-sizing: border-box;
 }
 
+/* Общие стили для слайдеров — webkit track нужен чтобы thumb центрировался */
+.slider-black-thumb::-webkit-slider-runnable-track,
+.slider-gold-thumb::-webkit-slider-runnable-track {
+  height: 16px;
+  border-radius: 8px;
+}
+
 /* Черный ползунок для слайдеров оценок */
 .slider-black-thumb::-webkit-slider-thumb {
   appearance: none;
@@ -25,7 +32,7 @@ body {
   cursor: pointer;
   border: 3px solid #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  margin-top: -14px;
+  margin-top: -11px;
 }
 
 .slider-black-thumb::-moz-range-thumb {
@@ -48,7 +55,7 @@ body {
   cursor: pointer;
   border: 3px solid #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  margin-top: -14px;
+  margin-top: -11px;
 }
 
 .slider-gold-thumb::-moz-range-thumb {
