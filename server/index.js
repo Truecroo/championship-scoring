@@ -434,10 +434,18 @@ app.put('/api/teams/:id', requireAdmin, async (req, res) => {
     const { id } = req.params
     if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
 
-    const { penalty } = req.body
+    const { penalty, name } = req.body
+    const updateData = {}
+    if (penalty !== undefined) updateData.penalty = penalty ?? 0
+    if (name !== undefined) {
+      if (!name || !name.trim()) return res.status(400).json({ error: 'Название не может быть пустым' })
+      updateData.name = name.trim()
+    }
+    if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'Нечего обновлять' })
+
     const { error } = await supabase
       .from('teams')
-      .update({ penalty: penalty ?? 0 })
+      .update(updateData)
       .eq('id', id)
 
     if (error) throw error
