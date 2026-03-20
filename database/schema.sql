@@ -7,6 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS nominations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -39,6 +40,9 @@ CREATE TABLE IF NOT EXISTS scores (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(judge_id, team_id)
 );
+
+-- Migration: add display_order column to nominations
+-- ALTER TABLE nominations ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 -- Migration: add display_order column to teams
 -- ALTER TABLE teams ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;

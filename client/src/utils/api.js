@@ -98,6 +98,16 @@ export const deleteNomination = api(
   })
 )
 
+// Reorder nominations
+export const reorderNominations = api(
+  () => Promise.resolve(),
+  async (nominationIds) => safeFetch(`${API_URL}/nominations/reorder`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify({ nomination_ids: nominationIds })
+  })
+)
+
 // Teams
 export const getTeams = api(
   mockApi.getTeams,

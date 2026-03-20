@@ -318,6 +318,7 @@ app.get('/api/nominations', cached('nominations', 5000, async () => {
   const { data, error } = await supabase
     .from('nominations')
     .select('*')
+    .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
   if (error) throw error
   return data
@@ -353,6 +354,33 @@ app.delete('/api/nominations/:id', requireAdmin, async (req, res) => {
       .eq('id', id)
 
     if (error) throw error
+    cache.delete('nominations')
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Reorder nominations
+app.put('/api/nominations/reorder', requireAdmin, async (req, res) => {
+  try {
+    const { nomination_ids } = req.body
+
+    if (!Array.isArray(nomination_ids) || nomination_ids.length === 0) {
+      return res.status(400).json({ error: 'nomination_ids must be a non-empty array' })
+    }
+
+    const updates = nomination_ids.map((id, index) =>
+      supabase
+        .from('nominations')
+        .update({ display_order: index })
+        .eq('id', id)
+    )
+
+    const results = await Promise.all(updates)
+    const failed = results.find(r => r.error)
+    if (failed) throw failed.error
+
     cache.delete('nominations')
     res.json({ success: true })
   } catch (error) {
