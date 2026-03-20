@@ -683,12 +683,16 @@ export default function AdminPage() {
     })
 
     // Create hidden container, render, export
+    // NOTE: must be visible and in-flow for html2canvas to capture correctly
     const container = document.createElement('div')
     container.innerHTML = pages.join('')
-    container.style.position = 'fixed'
-    container.style.left = '-9999px'
+    container.style.position = 'absolute'
+    container.style.left = '0'
     container.style.top = '0'
     container.style.width = '297mm'
+    container.style.opacity = '0'
+    container.style.pointerEvents = 'none'
+    container.style.zIndex = '-9999'
     document.body.appendChild(container)
 
     try {
