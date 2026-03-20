@@ -5,7 +5,7 @@ import {
   Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw, AlertCircle, CheckCircle, Pencil, ChevronRight, ShieldAlert
 } from 'lucide-react'
 import {
-  getNominations, createNomination, deleteNomination,
+  getNominations, createNomination, deleteNomination, reorderNominations,
   getTeams, createTeam, deleteTeam, reorderTeams, updateTeamPenalty, updateTeamName,
   getResults, setCurrentTeam, getCurrentTeam, getScores, getJudges
 } from '../utils/api'
@@ -155,6 +155,20 @@ export default function AdminPage() {
       loadData()
     } catch (error) {
       showToast('Ошибка удаления номинации', 'error')
+    }
+  }
+
+  const handleReorderNomination = async (index, direction) => {
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= nominations.length) return
+    const reordered = [...nominations]
+    ;[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]]
+    setNominations(reordered)
+    try {
+      await reorderNominations(reordered.map(n => n.id))
+    } catch {
+      showToast('Ошибка сортировки', 'error')
+      loadData()
     }
   }
 
@@ -858,7 +872,7 @@ export default function AdminPage() {
               </form>
 
               <div className="space-y-3">
-                {nominations.map((nom) => (
+                {nominations.map((nom, idx) => (
                   <div
                     key={nom.id}
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -867,12 +881,28 @@ export default function AdminPage() {
                       <Trophy className="w-5 h-5" style={{ color: '#FF6E00' }} />
                       <span className="font-medium">{nom.name}</span>
                     </div>
-                    <button
-                      onClick={() => handleDeleteNomination(nom.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleReorderNomination(idx, -1)}
+                        disabled={idx === 0}
+                        className="p-2 text-gray-500 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30"
+                      >
+                        <ChevronUp className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleReorderNomination(idx, 1)}
+                        disabled={idx === nominations.length - 1}
+                        className="p-2 text-gray-500 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30"
+                      >
+                        <ChevronDown className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteNomination(nom.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {nominations.length === 0 && (
