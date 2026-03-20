@@ -171,7 +171,10 @@ export const updateScore = api(
 
 export const deleteScore = api(
   mockApi.deleteScore,
-  async (id) => safeFetchNoBody(`${API_URL}/scores/${id}`, { method: 'DELETE' })
+  async (id) => safeFetchNoBody(`${API_URL}/scores/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': getAdminToken() }
+  })
 )
 
 // Spectator Scores
