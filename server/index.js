@@ -4,6 +4,7 @@ import cors from 'cors'
 import bcrypt from 'bcryptjs'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
 const app = express()
@@ -124,6 +125,17 @@ const adminSessions = new Map() // token -> { createdAt }
 const MODERATOR_SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
 const moderatorSessions = new Map() // token -> { createdAt }
 
+// Clean up expired sessions every hour
+setInterval(() => {
+  const now = Date.now()
+  for (const [token, session] of adminSessions) {
+    if (now - session.createdAt > ADMIN_SESSION_TTL) adminSessions.delete(token)
+  }
+  for (const [token, session] of moderatorSessions) {
+    if (now - session.createdAt > MODERATOR_SESSION_TTL) moderatorSessions.delete(token)
+  }
+}, 60 * 60 * 1000)
+
 // Middleware to check admin authorization
 const requireAdmin = (req, res, next) => {
   const token = req.headers['x-admin-token']
@@ -240,7 +252,6 @@ app.post('/api/auth/admin/login', authLimiter, async (req, res) => {
     }
 
     // Generate session token with expiry tracking
-    const crypto = await import('crypto')
     const token = crypto.randomBytes(32).toString('hex')
     adminSessions.set(token, { createdAt: Date.now() })
 
@@ -275,7 +286,6 @@ app.post('/api/auth/moderator/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Неверный пароль модератора' })
     }
 
-    const crypto = await import('crypto')
     const token = crypto.randomBytes(32).toString('hex')
     moderatorSessions.set(token, { createdAt: Date.now() })
 
@@ -557,7 +567,16 @@ app.put('/api/scores/:id', async (req, res) => {
   try {
     const { id } = req.params
     if (!isValidUUID(id)) return res.status(400).json({ error: 'Некорректный ID' })
-    const { scores } = req.body
+    const { judge_id, scores } = req.body
+
+    // Verify the score belongs to this judge
+    if (judge_id) {
+      const { data: existing } = await supabase
+        .from('scores').select('judge_id').eq('id', id).single()
+      if (existing && existing.judge_id !== judge_id) {
+        return res.status(403).json({ error: 'Нельзя редактировать чужую оценку' })
+      }
+    }
 
     // Calculate weighted average only from filled criteria (proportional)
     let totalWeighted = 0
