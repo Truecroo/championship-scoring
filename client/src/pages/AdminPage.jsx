@@ -396,10 +396,10 @@ export default function AdminPage() {
     }
 
     const CRITERIA = [
-      { key: 'choreography', label: 'Хореография и рисунки', weight: '45%' },
-      { key: 'technique', label: 'Техника и исполнение', weight: '35%' },
-      { key: 'artistry', label: 'Артистизм, образ и костюм', weight: '15%' },
-      { key: 'overall', label: 'Общее впечатление', weight: '5%' },
+      { key: 'choreography', label: '\u266B Хореография и рисунки', weight: '45%' },
+      { key: 'technique', label: '\u2726 Техника и исполнение', weight: '35%' },
+      { key: 'artistry', label: '\u263A Артистизм, образ и костюм', weight: '15%' },
+      { key: 'overall', label: '\u2605 Общее впечатление', weight: '5%' },
     ]
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
@@ -1154,7 +1154,7 @@ export default function AdminPage() {
                     Экспорт в Excel
                   </button>
                   <button
-                    onClick={handleExportPDFv2}
+                    onClick={handleExportPDF}
                     disabled={results.length === 0 || allScores.length === 0}
                     className="px-4 py-2 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold hover:opacity-90"
                     style={{ backgroundColor: '#DC2626' }}
