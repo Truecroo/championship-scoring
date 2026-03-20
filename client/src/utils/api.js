@@ -127,6 +127,15 @@ export const updateTeamPenalty = api(
   })
 )
 
+export const updateTeamName = api(
+  () => Promise.resolve(),
+  async (id, name) => safeFetch(`${API_URL}/teams/${id}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify({ name })
+  })
+)
+
 export const deleteTeam = api(
   mockApi.deleteTeam,
   async (id) => safeFetchNoBody(`${API_URL}/teams/${id}`, {

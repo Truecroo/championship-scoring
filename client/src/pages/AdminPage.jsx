@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Trophy, Users,
-  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw, AlertCircle, CheckCircle, Pencil, ChevronRight
+  Eye, BarChart3, Settings, ChevronUp, ChevronDown, Download, QrCode, LogOut, RefreshCw, AlertCircle, CheckCircle, Pencil, ChevronRight, ShieldAlert
 } from 'lucide-react'
 import {
   getNominations, createNomination, deleteNomination,
-  getTeams, createTeam, deleteTeam, reorderTeams, updateTeamPenalty,
+  getTeams, createTeam, deleteTeam, reorderTeams, updateTeamPenalty, updateTeamName,
   getResults, setCurrentTeam, getCurrentTeam, getScores, getJudges
 } from '../utils/api'
 import * as XLSX from 'xlsx'
@@ -186,6 +186,18 @@ export default function AdminPage() {
       loadData()
     } catch (error) {
       showToast('Ошибка сохранения штрафа', 'error')
+    }
+  }
+
+  const handleEditName = async (teamId, currentName) => {
+    const newName = prompt('Новое название команды:', currentName)
+    if (newName === null || newName.trim() === '' || newName.trim() === currentName) return
+    try {
+      await updateTeamName(teamId, newName.trim())
+      showToast('Название обновлено')
+      loadData()
+    } catch (error) {
+      showToast('Ошибка переименования', 'error')
     }
   }
 
@@ -961,13 +973,20 @@ export default function AdminPage() {
                                         )}
                                       </p>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
                                       <button
-                                        onClick={() => handleEditPenalty(team.id, team.penalty)}
-                                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-                                        title="Изменить штраф"
+                                        onClick={() => handleEditName(team.id, team.name)}
+                                        className="p-2 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                                        title="Переименовать"
                                       >
                                         <Pencil className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleEditPenalty(team.id, team.penalty)}
+                                        className="p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                                        title="Изменить штраф"
+                                      >
+                                        <ShieldAlert className="w-4 h-4" />
                                       </button>
                                       <button
                                         onClick={() => handleMoveTeamUp(team.id, nomination.id)}
