@@ -568,7 +568,7 @@ app.post('/api/scores', async (req, res) => {
         totalWeight += weight
       }
     }
-    const weightedAverage = totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
+    const weightedAverage = totalWeight > 0 ? totalWeighted / totalWeight : 0
 
     // Transform frontend format to database format (null for unfilled criteria)
     const scoreData = {
@@ -624,7 +624,7 @@ app.put('/api/scores/:id', async (req, res) => {
         totalWeight += weight
       }
     }
-    const weightedAverage = totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
+    const weightedAverage = totalWeight > 0 ? totalWeighted / totalWeight : 0
 
     // Transform frontend format to database format (null for unfilled criteria)
     const scoreData = {
@@ -983,10 +983,10 @@ app.get('/api/results', async (req, res) => {
         team_name: team.name,
         nomination_id: team.nomination_id,
         nomination_name: team.nominations?.name || '',
-        judges_score: Math.round((judgesWeightedScore + penalty) * 100) / 100,
+        judges_score: judgesWeightedScore + penalty,
         judges_count: judgeAvgs.length,
         penalty,
-        spectators_avg: Math.round(spectatorsAvg * 100) / 100,
+        spectators_avg: spectatorsAvg,
         spectator_votes: specScores.length,
         top3_points: top3Map.get(team.id) || 0
       }
