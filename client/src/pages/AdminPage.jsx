@@ -14,7 +14,6 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import pdfFonts from 'pdfmake/build/vfs_fonts'
 import { QRCodeCanvas } from 'qrcode.react'
-import html2pdf from 'html2pdf.js'
 
 // Smart score formatting: 2 decimals by default, 3 if there are duplicates at 2
 function formatScore(value, allValues = []) {
@@ -385,9 +384,9 @@ export default function AdminPage() {
           })
         })
         row.push(
-          r.judges_score ?? '',
+          r.judges_score != null ? r.judges_score - (r.penalty || 0) : '',
           r.penalty || 0,
-          r.judges_score ? r.judges_score - (r.penalty || 0) : ''
+          r.judges_score ?? ''
         )
         rows.push(row)
       })
@@ -615,135 +614,6 @@ export default function AdminPage() {
     doc.save(`Судейские_листы_${timestamp}.pdf`)
   }
 
-  const handleExportPDFv2 = async () => {
-    if (results.length === 0 || allScores.length === 0) {
-      alert('Нет данных для экспорта PDF (нужны оценки судей)')
-      return
-    }
-
-    const CRITERIA = [
-      { key: 'choreography', emoji: '💃', label: 'Хореография и рисунки', weight: '45%' },
-      { key: 'technique', emoji: '⚡', label: 'Техника и исполнение', weight: '35%' },
-      { key: 'artistry', emoji: '🎭', label: 'Артистизм, образ и костюм', weight: '15%' },
-      { key: 'overall', emoji: '⭐', label: 'Общее впечатление', weight: '5%' },
-    ]
-
-    const resultsByNomination = results.reduce((acc, r) => {
-      if (!acc[r.nomination_name]) acc[r.nomination_name] = []
-      acc[r.nomination_name].push(r)
-      return acc
-    }, {})
-
-    // Build HTML pages
-    const pages = []
-
-    Object.entries(resultsByNomination).forEach(([nominationName, nominationResults]) => {
-      const sorted = [...nominationResults] // display_order from API
-
-      sorted.forEach(result => {
-        const teamScores = allScores.filter(
-          s => s.team_id === result.team_id && s.nomination_id === result.nomination_id
-        )
-        if (teamScores.length === 0) return
-
-        const teamJudges = teamScores
-          .sort((a, b) => String(a.judge_id).localeCompare(String(b.judge_id)))
-          .map(s => {
-            const judgeName = judges.find(j => String(j.id) === String(s.judge_id))?.name || `Судья ${s.judge_id}`
-            return { name: judgeName, scores: s.scores }
-          })
-
-        const teamPenalty = result.penalty || 0
-        const finalScore = result.judges_score
-
-        const judgeHeaders = teamJudges.map(j => `<th style="background:#1d1d1d;color:#fff;padding:10px 8px;font-size:13px;text-align:center;min-width:100px;">${j.name}</th>`).join('')
-
-        const criteriaRows = CRITERIA.map((c, i) => {
-          const bg = i % 2 === 1 ? '#f5f7fa' : '#fff'
-          const judgeCells = teamJudges.map(j => {
-            const val = j.scores[c.key]
-            const score = val?.score != null ? Number(val.score).toFixed(1) : '—'
-            const comment = val?.comment || '—'
-            return `<td style="background:${bg};text-align:center;padding:8px;vertical-align:top;">
-              <div style="font-size:16px;font-weight:bold;">${score}</div>
-              <div style="font-size:9px;color:#888;margin-top:2px;">${comment}</div>
-            </td>`
-          }).join('')
-          return `<tr>
-            <td style="background:${bg};padding:10px;font-weight:bold;font-size:13px;">${c.emoji} ${c.label}</td>
-            <td style="background:${bg};text-align:center;padding:10px;font-size:12px;">${c.weight}</td>
-            ${judgeCells}
-          </tr>`
-        }).join('')
-
-        const penaltyRow = teamPenalty !== 0 ? `<tr>
-          <td style="background:#fef2f2;padding:10px;font-weight:bold;color:#dc2626;font-size:13px;">Штраф</td>
-          <td style="background:#fef2f2;"></td>
-          <td colspan="${teamJudges.length}" style="background:#fef2f2;text-align:center;padding:10px;font-weight:bold;color:#dc2626;font-size:15px;">${teamPenalty}</td>
-        </tr>` : ''
-
-        const html = `
-          <div style="page-break-after:always;padding:20px 30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-            <div style="text-align:center;margin-bottom:8px;">
-              <div style="font-size:12px;color:#999;letter-spacing:2px;">⭐⭐⭐ БЛЭСТ ЧЕМП 2026 ⭐⭐⭐</div>
-              <div style="font-size:26px;font-weight:bold;margin:6px 0;">СУДЕЙСКИЙ ЛИСТ</div>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:15px;">
-              <div><strong>Команда:</strong> ${result.team_name}</div>
-              <div><strong>Номинация:</strong> ${nominationName}</div>
-            </div>
-            <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
-              <thead>
-                <tr>
-                  <th style="background:#1d1d1d;color:#fff;padding:10px;text-align:left;font-size:13px;min-width:200px;">Критерий</th>
-                  <th style="background:#1d1d1d;color:#fff;padding:10px;text-align:center;font-size:13px;width:50px;">Вес</th>
-                  ${judgeHeaders}
-                </tr>
-              </thead>
-              <tbody>
-                ${criteriaRows}
-                ${penaltyRow}
-                <tr>
-                  <td style="background:#eff6ff;padding:12px;font-weight:bold;font-size:15px;">ИТОГО</td>
-                  <td style="background:#eff6ff;"></td>
-                  <td colspan="${teamJudges.length}" style="background:#eff6ff;text-align:center;padding:12px;font-weight:bold;font-size:20px;color:#1e40af;">${formatScore(finalScore)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div style="text-align:center;margin-top:20px;font-size:9px;color:#bbb;">БЛЭСТ ЧЕМП 2026 — Судейский протокол</div>
-          </div>
-        `
-        pages.push(html)
-      })
-    })
-
-    // Create hidden container, render, export
-    // NOTE: must be visible and in-flow for html2canvas to capture correctly
-    const container = document.createElement('div')
-    container.innerHTML = pages.join('')
-    container.style.position = 'absolute'
-    container.style.left = '0'
-    container.style.top = '0'
-    container.style.width = '297mm'
-    container.style.opacity = '0'
-    container.style.pointerEvents = 'none'
-    container.style.zIndex = '-9999'
-    document.body.appendChild(container)
-
-    try {
-      const timestamp = new Date().toISOString().split('T')[0]
-      await html2pdf().set({
-        margin: [5, 5, 5, 5],
-        filename: `Судейские_листы_${timestamp}.pdf`,
-        image: { type: 'png', quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' },
-        pagebreak: { mode: ['css'] },
-      }).from(container).save()
-    } finally {
-      document.body.removeChild(container)
-    }
-  }
 
   const handleLogout = () => {
     if (confirm('Вы уверены что хотите выйти?')) {
