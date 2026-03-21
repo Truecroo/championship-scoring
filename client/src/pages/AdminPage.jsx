@@ -16,6 +16,15 @@ import pdfFonts from 'pdfmake/build/vfs_fonts'
 import { QRCodeCanvas } from 'qrcode.react'
 import html2pdf from 'html2pdf.js'
 
+// Smart score formatting: 2 decimals by default, 3 if there are duplicates at 2
+function formatScore(value, allValues = []) {
+  if (value == null) return '—'
+  const s2 = value.toFixed(2)
+  // Check if any other value in the group looks the same at 2 decimals
+  const hasDuplicate = allValues.some(v => v !== value && v != null && v.toFixed(2) === s2)
+  return hasDuplicate ? value.toFixed(3) : s2
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('nominations')
@@ -376,9 +385,9 @@ export default function AdminPage() {
           })
         })
         row.push(
-          r.judges_score ? Number(r.judges_score.toFixed(2)) : '',
+          r.judges_score ?? '',
           r.penalty || 0,
-          r.judges_score ? Number((r.judges_score - (r.penalty || 0)).toFixed(2)) : ''
+          r.judges_score ? r.judges_score - (r.penalty || 0) : ''
         )
         rows.push(row)
       })
@@ -519,7 +528,7 @@ export default function AdminPage() {
         body.push([
           'ИТОГО',
           '',
-          { content: finalScore.toFixed(2), colSpan: judgeCount, styles: { halign: 'center' } }
+          { content: formatScore(finalScore), colSpan: judgeCount, styles: { halign: 'center' } }
         ])
 
         const totalRows = body.length
@@ -697,7 +706,7 @@ export default function AdminPage() {
                 <tr>
                   <td style="background:#eff6ff;padding:12px;font-weight:bold;font-size:15px;">ИТОГО</td>
                   <td style="background:#eff6ff;"></td>
-                  <td colspan="${teamJudges.length}" style="background:#eff6ff;text-align:center;padding:12px;font-weight:bold;font-size:20px;color:#1e40af;">${finalScore.toFixed(2)}</td>
+                  <td colspan="${teamJudges.length}" style="background:#eff6ff;text-align:center;padding:12px;font-weight:bold;font-size:20px;color:#1e40af;">${formatScore(finalScore)}</td>
                 </tr>
               </tbody>
             </table>
@@ -1353,7 +1362,7 @@ export default function AdminPage() {
                                         <td className="px-4 py-3 font-medium">{result.team_name}</td>
                                         <td className="px-4 py-3 text-right">
                                           <span className="font-bold text-lg" style={{ color: '#FF6E00' }}>
-                                            {result.judges_score?.toFixed(2) || '—'}
+                                            {formatScore(result.judges_score, sortedByJudges.map(r => r.judges_score))}
                                           </span>
                                         </td>
                                         {hasPenaltyColumn && (
@@ -1413,7 +1422,7 @@ export default function AdminPage() {
                                                         )}
                                                       </td>
                                                       <td className="px-3 py-2 text-center font-bold" style={{ color: '#FF6E00' }}>
-                                                        {score.average?.toFixed(2) || '—'}
+                                                        {score.average != null ? score.average.toFixed(2) : '—'}
                                                       </td>
                                                     </tr>
                                                   )
@@ -1467,7 +1476,7 @@ export default function AdminPage() {
                                     {result.team_name}
                                   </p>
                                   <p className="text-sm text-amber-700">
-                                    {result.nomination_name} — {result.spectators_avg.toFixed(2)}
+                                    {result.nomination_name} — {formatScore(result.spectators_avg)}
                                     <span className="text-amber-600"> ({result.spectator_votes} голосов)</span>
                                   </p>
                                 </div>

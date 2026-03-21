@@ -246,7 +246,7 @@ export default function JudgePage() {
         totalWeight += c.weight
       }
     })
-    return totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
+    return totalWeight > 0 ? totalWeighted / totalWeight : 0
   }
 
   const calculateWeightedAverage = () => {
@@ -260,7 +260,7 @@ export default function JudgePage() {
       }
     })
 
-    return totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) / 100 : 0
+    return totalWeight > 0 ? totalWeighted / totalWeight : 0
   }
 
 
