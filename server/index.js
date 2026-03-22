@@ -968,7 +968,7 @@ app.get('/api/results', async (req, res) => {
       const judgeAvgs = judgeMap.get(key) || []
       let judgesWeightedScore = 0
       if (judgeAvgs.length > 0) {
-        judgesWeightedScore = judgeAvgs.reduce((a, b) => a + b, 0) / judgeAvgs.length
+        judgesWeightedScore = judgeAvgs.reduce((a, b) => a + b, 0)
       }
 
       const specScores = spectatorMap.get(key) || []
